@@ -1,6 +1,7 @@
 package config
 
 import (
+	"strconv"
 	"strings"
 	"time"
 
@@ -50,6 +51,7 @@ type Config struct {
 	SMTP SMTPConfig `mapstructure:"SMTP"`
 
 	StorageType string `mapstructure:"STORAGE_TYPE"` // "local", "s3", "gcs"
+	Compression string `mapstructure:"COMPRESSION"`  // "zstd", "gzip", "none"
 
 	LocalStorage LocalStorageConfig `mapstructure:"LOCAL_STORAGE"`
 	S3Storage    S3StorageConfig    `mapstructure:"S3_STORAGE"`
@@ -70,17 +72,49 @@ func LoadConfig() (*Config, error) {
 	viper.SetDefault("SMTP.MAX_RECIPIENTS", 50)
 
 	viper.SetDefault("STORAGE_TYPE", "local")
+	viper.SetDefault("COMPRESSION", "none")
 	viper.SetDefault("LOCAL_STORAGE.BASE_PATH", "./data/emails")
+
+	// Try to load .env file
+	viper.SetConfigFile(".env")
+	viper.SetConfigType("env")
+	if err := viper.ReadInConfig(); err != nil {
+		// It's okay if config file is not found
+	}
 
 	viper.SetEnvPrefix("MAILEROO")
 	viper.AutomaticEnv()
-	// Bind common names to the prefixed env vars
-	viper.BindEnv("DATABASE_URL") 
+	viper.BindEnv("DATABASE_URL")
 	viper.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
+
+	// Explicitly bind nested keys if needed, though AutomaticEnv + Replacer should work.
+	// But let's handle the manual override for common ones if they fail.
 
 	var cfg Config
 	if err := viper.Unmarshal(&cfg); err != nil {
 		return nil, err
+	}
+
+	// Manual override for comma-separated ports in ENV
+	if envPorts := viper.GetString("SMTP_PORTS"); envPorts != "" {
+		parts := strings.Split(envPorts, ",")
+		var ports []int
+		for _, p := range parts {
+			if pi, err := strconv.Atoi(strings.TrimSpace(p)); err == nil {
+				ports = append(ports, pi)
+			}
+		}
+		if len(ports) > 0 {
+			cfg.SMTP.Ports = ports
+		}
+	}
+
+	// Manual override for TLS files because nested structs in viper can be tricky with prefixes
+	if cert := viper.GetString("SMTP_TLS_CERT_FILE"); cert != "" {
+		cfg.SMTP.TLSCertFile = cert
+	}
+	if key := viper.GetString("SMTP_TLS_KEY_FILE"); key != "" {
+		cfg.SMTP.TLSKeyFile = key
 	}
 
 	return &cfg, nil

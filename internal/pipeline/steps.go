@@ -2,6 +2,7 @@ package pipeline
 
 import (
 	"bytes"
+	"compress/gzip"
 	"context"
 	"fmt"
 	"io"
@@ -13,25 +14,67 @@ import (
 	"github.com/colormechadd/maileroo/pkg/models"
 	"github.com/emersion/go-message/mail"
 	"github.com/emersion/go-msgauth/dkim"
+	"github.com/emersion/go-msgauth/dmarc"
 	"github.com/google/uuid"
+	"github.com/klauspost/compress/zstd"
 	"github.com/zaccone/spf"
 )
 
-// ValidateSPF performs SPF check and returns status, details, and error
-func ValidateSPF(ctx context.Context, p *Pipeline, ictx *IngestionContext) (StepStatus, any, error) {
-	res, explanation, err := spf.CheckHost(ictx.RemoteIP, ictx.FromAddress, ictx.FromAddress)
-	status := StatusFail
-	if res == spf.Pass {
-		status = StatusPass
-	} else if res == spf.Neutral || res == spf.None {
-		status = StatusNeutral
+// ValidateSender performs SPF, DKIM and optionally DMARC checks.
+// It requires either SPF or DKIM to pass.
+func ValidateSender(ctx context.Context, p *Pipeline, ictx *IngestionContext) (StepStatus, any, error) {
+	domain := extractDomain(ictx.FromAddress)
+
+	// 1. SPF Check
+	spfRes, spfExp, spfErr := spf.CheckHost(ictx.RemoteIP, domain, ictx.FromAddress)
+	spfPass := (spfRes == spf.Pass)
+
+	// 2. DKIM Check
+	dkimStatus, dkimResults, _ := checkDKIM(ictx.RawMessage)
+	dkimPass := (dkimStatus == StatusPass)
+
+	results := map[string]any{
+		"spf": map[string]any{
+			"result":      spfRes.String(),
+			"explanation": spfExp,
+			"error":       spfErr,
+		},
+		"dkim": dkimResults,
 	}
-	return status, map[string]any{"result": res.String(), "explanation": explanation}, err
+
+	if spfPass || dkimPass {
+		return StatusPass, results, nil
+	}
+
+	// 3. DMARC Check (only if both failed)
+	dmarcRecord, dmarcErr := dmarc.Lookup(domain)
+	if dmarcErr == nil && dmarcRecord != nil {
+		results["dmarc"] = map[string]any{
+			"policy": string(dmarcRecord.Policy),
+			"status": "found",
+		}
+
+		if dmarcRecord.Policy == dmarc.PolicyNone {
+			return StatusPass, results, nil
+		}
+
+		if dmarcRecord.Policy == dmarc.PolicyReject || dmarcRecord.Policy == dmarc.PolicyQuarantine {
+			return StatusFail, results, nil
+		}
+	} else {
+		results["dmarc"] = map[string]any{
+			"status": "not_found",
+			"error":  dmarcErr,
+		}
+	}
+
+	// If we got here, both SPF and DKIM failed, and either no DMARC or DMARC p=none.
+	// We'll mark as fail because the requirement was "either dkim or spf to be valid".
+	return StatusFail, results, nil
 }
 
-// ValidateDKIM performs DKIM check and returns status, details, and error
-func ValidateDKIM(ctx context.Context, p *Pipeline, ictx *IngestionContext) (StepStatus, any, error) {
-	r := bytes.NewReader(ictx.RawMessage)
+func checkDKIM(raw []byte) (StepStatus, []any, error) {
+	r := bytes.NewReader(raw)
 	verifications, err := dkim.Verify(r)
 	if err != nil {
 		return StatusError, nil, err
@@ -41,9 +84,9 @@ func ValidateDKIM(ctx context.Context, p *Pipeline, ictx *IngestionContext) (Ste
 	results := []any{}
 	for _, v := range verifications {
 		vErr := v.Err
-		vStatus := StatusPass
+		vStatus := "pass"
 		if vErr != nil {
-			vStatus = StatusFail
+			vStatus = "fail"
 			status = StatusFail
 		} else if status != StatusFail {
 			status = StatusPass
@@ -55,6 +98,14 @@ func ValidateDKIM(ctx context.Context, p *Pipeline, ictx *IngestionContext) (Ste
 		})
 	}
 	return status, results, nil
+}
+
+func extractDomain(address string) string {
+	parts := strings.Split(address, "@")
+	if len(parts) != 2 {
+		return ""
+	}
+	return parts[1]
 }
 
 // ValidateRBL checks the remote IP against configured RBL servers
@@ -94,7 +145,6 @@ func reverseIP(ip net.IP) string {
 	if ipv4 := ip.To4(); ipv4 != nil {
 		return fmt.Sprintf("%d.%d.%d.%d", ipv4[3], ipv4[2], ipv4[1], ipv4[0])
 	}
-	// TODO: Support IPv6 reversal if needed
 	return ""
 }
 
@@ -112,11 +162,44 @@ func CheckBlockingRules(ctx context.Context, p *Pipeline, ictx *IngestionContext
 	return StatusPass, map[string]any{"blocked": false}, nil
 }
 
+func compressData(data []byte, algorithm string) ([]byte, string, error) {
+	switch strings.ToLower(algorithm) {
+	case "zstd":
+		var buf bytes.Buffer
+		zw, _ := zstd.NewWriter(&buf)
+		if _, err := zw.Write(data); err != nil {
+			return nil, "", err
+		}
+		if err := zw.Close(); err != nil {
+			return nil, "", err
+		}
+		return buf.Bytes(), ".zst", nil
+	case "gzip":
+		var buf bytes.Buffer
+		gw := gzip.NewWriter(&buf)
+		if _, err := gw.Write(data); err != nil {
+			return nil, "", err
+		}
+		if err := gw.Close(); err != nil {
+			return nil, "", err
+		}
+		return buf.Bytes(), ".gz", nil
+	default:
+		return data, "", nil
+	}
+}
+
 // Deliver handles both storage and database persistence in one logical step
 func Deliver(ctx context.Context, p *Pipeline, ictx *IngestionContext) (StepStatus, any, error) {
 	// 1. Store raw email
-	ictx.StorageKey = fmt.Sprintf("%s/%s.eml", ictx.TargetMailboxID, ictx.ID)
-	if err := p.storage.Save(ctx, ictx.StorageKey, bytes.NewReader(ictx.RawMessage)); err != nil {
+	data, suffix, err := compressData(ictx.RawMessage, p.cfg.Compression)
+	if err != nil {
+		return StatusError, nil, fmt.Errorf("compression failed: %w", err)
+	}
+
+	ictx.StorageKey = fmt.Sprintf("%s/%s.eml%s", ictx.TargetMailboxID, ictx.ID, suffix)
+
+	if err := p.storage.Save(ctx, ictx.StorageKey, bytes.NewReader(data)); err != nil {
 		return StatusError, nil, fmt.Errorf("storage save failed: %w", err)
 	}
 
@@ -203,17 +286,25 @@ func Deliver(ctx context.Context, p *Pipeline, ictx *IngestionContext) (StepStat
 		case *mail.AttachmentHeader:
 			filename, _ := h.Filename()
 			contentType, _, _ := h.ContentType()
-			attID := uuid.New()
-			attKey := fmt.Sprintf("%s/attachments/%s/%s_%s", ictx.TargetMailboxID, emailID, attID, filename)
 
-			var buf bytes.Buffer
-			size, err := io.Copy(&buf, pPart.Body)
+			// Buffer attachment
+			attData, err := io.ReadAll(pPart.Body)
 			if err != nil {
 				slog.Error("failed to read attachment body", "ingestion_id", ictx.ID, "filename", filename, "error", err)
 				continue
 			}
 
-			if err := p.storage.Save(ctx, attKey, bytes.NewReader(buf.Bytes())); err != nil {
+			// Compress attachment
+			cData, aSuffix, err := compressData(attData, p.cfg.Compression)
+			if err != nil {
+				slog.Error("failed to compress attachment", "filename", filename, "error", err)
+				continue
+			}
+
+			attID := uuid.New()
+			attKey := fmt.Sprintf("%s/attachments/%s/%s_%s%s", ictx.TargetMailboxID, emailID, attID, filename, aSuffix)
+
+			if err := p.storage.Save(ctx, attKey, bytes.NewReader(cData)); err != nil {
 				slog.Error("failed to save attachment to storage", "ingestion_id", ictx.ID, "filename", filename, "error", err)
 				continue
 			}
@@ -223,7 +314,7 @@ func Deliver(ctx context.Context, p *Pipeline, ictx *IngestionContext) (StepStat
 				EmailID:     emailID,
 				Filename:    filename,
 				ContentType: contentType,
-				Size:        size,
+				Size:        int64(len(attData)),
 				StorageKey:  attKey,
 			}
 
@@ -240,6 +331,7 @@ func Deliver(ctx context.Context, p *Pipeline, ictx *IngestionContext) (StepStat
 		"thread_id":   threadID,
 		"attachments": attachmentCount,
 		"storage_key": ictx.StorageKey,
+		"compression": p.cfg.Compression,
 	}, nil
 }
 

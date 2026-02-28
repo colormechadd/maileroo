@@ -16,6 +16,8 @@ type WebDB interface {
 	GetUserByID(ctx context.Context, id uuid.UUID) (*models.User, error)
 	GetMailboxesByUserID(ctx context.Context, userID uuid.UUID) ([]models.Mailbox, error)
 	GetEmailsByMailboxID(ctx context.Context, mailboxID uuid.UUID, limit, offset int) ([]models.Email, error)
+	GetEmailByID(ctx context.Context, emailID uuid.UUID) (*models.Email, error)
+	GetAttachmentsByEmailID(ctx context.Context, emailID uuid.UUID) ([]models.EmailAttachment, error)
 }
 
 func (db *DB) GetUserByUsername(ctx context.Context, username string) (*models.User, error) {
@@ -68,4 +70,23 @@ func (db *DB) GetEmailsByMailboxID(ctx context.Context, mailboxID uuid.UUID, lim
 		LIMIT $2 OFFSET $3
 	`, mailboxID, limit, offset)
 	return emails, err
+}
+
+func (db *DB) GetEmailByID(ctx context.Context, emailID uuid.UUID) (*models.Email, error) {
+	var email models.Email
+	err := db.GetContext(ctx, &email, `
+		SELECT 
+			id, mailbox_id, thread_id, address_mapping_id, ingestion_id, message_id, 
+			in_reply_to, "references", subject, from_address, to_address, 
+			reply_to_address, storage_key, size, receive_datetime, is_read, is_star
+		FROM email 
+		WHERE id = $1
+	`, emailID)
+	return &email, err
+}
+
+func (db *DB) GetAttachmentsByEmailID(ctx context.Context, emailID uuid.UUID) ([]models.EmailAttachment, error) {
+	var attachments []models.EmailAttachment
+	err := db.SelectContext(ctx, &attachments, "SELECT id, email_id, filename, content_type, size, storage_key FROM email_attachment WHERE email_id = $1", emailID)
+	return attachments, err
 }

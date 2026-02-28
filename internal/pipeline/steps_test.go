@@ -11,31 +11,20 @@ import (
 	"github.com/stretchr/testify/mock"
 )
 
-func TestValidateSPF(t *testing.T) {
+func TestValidateSender(t *testing.T) {
 	ctx := context.Background()
 	p := &Pipeline{}
 	
-	t.Run("loopback ip", func(t *testing.T) {
+	t.Run("basic check", func(t *testing.T) {
 		ictx := &IngestionContext{
 			RemoteIP:    net.ParseIP("127.0.0.1"),
-			FromAddress: "test@example.com",
+			FromAddress: "test@gmail.com",
+			RawMessage:  []byte("Subject: Test\n\nNo DKIM here"),
 		}
-		status, _, _ := ValidateSPF(ctx, p, ictx)
-		assert.Contains(t, []StepStatus{StatusPass, StatusNeutral, StatusFail, StatusError}, status)
-	})
-}
-
-func TestValidateDKIM(t *testing.T) {
-	ctx := context.Background()
-	p := &Pipeline{}
-
-	t.Run("no signature", func(t *testing.T) {
-		ictx := &IngestionContext{
-			RawMessage: []byte("Subject: Test\n\nNo DKIM here"),
-		}
-		status, _, err := ValidateDKIM(ctx, p, ictx)
+		status, _, err := ValidateSender(ctx, p, ictx)
 		assert.NoError(t, err)
-		assert.Equal(t, StatusNone, status)
+		// We expect a result (likely Fail if on loopback without valid DKIM)
+		assert.Contains(t, []StepStatus{StatusPass, StatusFail, StatusError}, status)
 	})
 }
 
@@ -90,7 +79,9 @@ func TestDeliver(t *testing.T) {
 	ctx := context.Background()
 	mockDB := new(MockDB)
 	mockStorage := new(MockStorage)
-	p := &Pipeline{db: mockDB, storage: mockStorage}
+	cfg := &config.Config{}
+	cfg.Compression = "none"
+	p := &Pipeline{cfg: cfg, db: mockDB, storage: mockStorage}
 
 	mailboxID := uuid.New()
 	ingestionID := uuid.New()

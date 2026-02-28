@@ -1,0 +1,70 @@
+package templates
+
+import (
+	"fmt"
+	"github.com/colormechadd/maileroo/pkg/models"
+)
+
+templ EmailDetail(email *models.Email, attachments []models.EmailAttachment, body string) {
+	<div class="flex-1 flex flex-col h-full bg-white overflow-hidden animate-in fade-in duration-300">
+		<header class="p-8 border-b border-purple-100 flex flex-col space-y-4">
+			<div class="flex items-center justify-between">
+				<h1 class="text-2xl font-bold text-gray-900">{ email.Subject }</h1>
+				<div class="flex items-center space-x-2">
+					if email.IsStar {
+						<span class="text-yellow-400">★</span>
+					}
+					<button class="text-gray-400 hover:text-gray-600 transition-colors cursor-pointer" hx-get={ "/mailbox/" + email.MailboxID.String() } hx-target="#main-content">
+						<svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+							<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+						</svg>
+					</button>
+				</div>
+			</div>
+			
+			<div class="flex items-center justify-between text-sm">
+				<div class="flex items-center">
+					<div class="h-10 w-10 rounded-full bg-teal-100 flex items-center justify-center text-teal-700 font-bold mr-3">
+						{ email.FromAddress[:1] }
+					</div>
+					<div>
+						<p class="font-bold text-gray-900">{ email.FromAddress }</p>
+						<p class="text-gray-500">to { email.ToAddress }</p>
+					</div>
+				</div>
+				<p class="text-gray-400">
+					{ email.ReceiveDatetime.Format("Monday, Jan 02, 2006 at 15:04") }
+				</p>
+			</div>
+		</header>
+
+		<div class="flex-1 overflow-y-auto p-8 prose prose-purple max-w-none">
+			<!-- Render body (handle potential HTML vs Text later) -->
+			<div class="whitespace-pre-wrap font-sans text-gray-800 leading-relaxed">
+				{ body }
+			</div>
+		</div>
+
+		if len(attachments) > 0 {
+			<footer class="p-8 border-t border-purple-50 bg-gray-50/50">
+				<h3 class="text-sm font-bold text-gray-500 uppercase tracking-wider mb-4">Attachments ({ fmt.Sprintf("%d", len(attachments)) })</h3>
+				<div class="flex flex-wrap gap-4">
+					for _, att := range attachments {
+						<a 
+							href={ templ.URL("/attachment/" + att.ID.String()) }
+							class="flex items-center p-3 bg-white border border-purple-100 rounded-lg hover:border-teal-300 hover:shadow-sm transition-all group"
+						>
+							<svg class="h-5 w-5 text-purple-400 group-hover:text-teal-500 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+								<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
+							</svg>
+							<div class="text-sm">
+								<p class="font-medium text-gray-900">{ att.Filename }</p>
+								<p class="text-gray-400 text-xs">{ fmt.Sprintf("%.1f KB", float64(att.Size)/1024) }</p>
+							</div>
+						</a>
+					}
+				</div>
+			</footer>
+		}
+	</div>
+}

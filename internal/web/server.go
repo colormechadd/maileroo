@@ -1,33 +1,41 @@
 package web
 
 import (
+	"compress/gzip"
 	"context"
 	"crypto/rand"
 	"encoding/hex"
+	"io"
 	"log/slog"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/a-h/templ"
 	"github.com/colormechadd/maileroo/internal/config"
 	"github.com/colormechadd/maileroo/internal/db"
+	"github.com/colormechadd/maileroo/internal/storage"
 	"github.com/colormechadd/maileroo/pkg/auth"
 	"github.com/colormechadd/maileroo/pkg/models"
 	"github.com/colormechadd/maileroo/templates"
+	"github.com/emersion/go-message/mail"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/google/uuid"
+	"github.com/klauspost/compress/zstd"
 )
 
 type Server struct {
-	cfg config.Config
-	db  db.WebDB
+	cfg     config.Config
+	db      db.WebDB
+	storage storage.Storage
 }
 
-func NewServer(cfg config.Config, webDB db.WebDB) *Server {
+func NewServer(cfg config.Config, webDB db.WebDB, storage storage.Storage) *Server {
 	return &Server{
-		cfg: cfg,
-		db:  webDB,
+		cfg:     cfg,
+		db:      webDB,
+		storage: storage,
 	}
 }
 
@@ -51,6 +59,7 @@ func (s *Server) Routes() chi.Router {
 		r.Use(s.AuthMiddleware)
 		r.Get("/", s.handleDashboard)
 		r.Get("/mailbox/{mailboxID}", s.handleMailboxView)
+		r.Get("/email/{emailID}", s.handleEmailView)
 	})
 
 	return r
@@ -172,7 +181,6 @@ func (s *Server) handleMailboxView(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Verify mailbox belongs to user
 	var found bool
 	for _, mb := range mailboxes {
 		if mb.ID == mailboxID {
@@ -192,7 +200,94 @@ func (s *Server) handleMailboxView(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if r.Header.Get("HX-Request") == "true" {
+		templates.MailboxContent(mailboxes, mailboxID, emails).Render(r.Context(), w)
+		return
+	}
+
 	templates.Dashboard(user, mailboxes, mailboxID, emails).Render(r.Context(), w)
+}
+
+func (s *Server) handleEmailView(w http.ResponseWriter, r *http.Request) {
+	emailIDStr := chi.URLParam(r, "emailID")
+	emailID, err := uuid.Parse(emailIDStr)
+	if err != nil {
+		http.Error(w, "Invalid email ID", http.StatusBadRequest)
+		return
+	}
+
+	email, err := s.db.GetEmailByID(r.Context(), emailID)
+	if err != nil {
+		slog.Error("failed to fetch email", "email_id", emailID, "error", err)
+		http.Error(w, "Email not found", http.StatusNotFound)
+		return
+	}
+
+	attachments, err := s.db.GetAttachmentsByEmailID(r.Context(), emailID)
+	if err != nil {
+		slog.Warn("failed to fetch attachments", "email_id", emailID, "error", err)
+	}
+
+	rc, err := s.storage.Get(r.Context(), email.StorageKey)
+	if err != nil {
+		slog.Error("failed to fetch email body from storage", "key", email.StorageKey, "error", err)
+		http.Error(w, "Failed to load email content", http.StatusInternalServerError)
+		return
+	}
+	defer rc.Close()
+
+	var bodyReader io.Reader = rc
+	if strings.HasSuffix(email.StorageKey, ".zst") {
+		zr, err := zstd.NewReader(rc)
+		if err != nil {
+			slog.Error("failed to create zstd reader", "key", email.StorageKey, "error", err)
+		} else {
+			defer zr.Close()
+			bodyReader = zr
+		}
+	} else if strings.HasSuffix(email.StorageKey, ".gz") {
+		gr, err := gzip.NewReader(rc)
+		if err != nil {
+			slog.Error("failed to create gzip reader", "key", email.StorageKey, "error", err)
+		} else {
+			defer gr.Close()
+			bodyReader = gr
+		}
+	}
+
+	mr, err := mail.CreateReader(bodyReader)
+	var content string
+	if err == nil {
+		defer mr.Close()
+		for {
+			p, err := mr.NextPart()
+			if err == io.EOF {
+				break
+			}
+			if err != nil {
+				break
+			}
+
+			var contentType string
+			switch h := p.Header.(type) {
+			case *mail.InlineHeader:
+				contentType, _, _ = h.ContentType()
+			case *mail.AttachmentHeader:
+				contentType, _, _ = h.ContentType()
+			}
+
+			if contentType == "text/plain" || contentType == "text/html" {
+				b, _ := io.ReadAll(p.Body)
+				content = string(b)
+				break
+			}
+		}
+	} else {
+		b, _ := io.ReadAll(bodyReader)
+		content = string(b)
+	}
+
+	templates.EmailDetail(email, attachments, content).Render(r.Context(), w)
 }
 
 func generateToken() string {

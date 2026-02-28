@@ -49,8 +49,7 @@ func NewPipeline(cfg *config.Config, db db.PipelineDB, storage storage.Storage) 
 		name string
 		fn   Step
 	}{
-		{"spf", ValidateSPF},
-		{"dkim", ValidateDKIM},
+		{"validate_sender", ValidateSender},
 		{"spam", ValidateRBL},
 		{"block", CheckBlockingRules},
 		{"deliver", Deliver},

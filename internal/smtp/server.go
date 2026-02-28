@@ -131,6 +131,8 @@ func StartServers(cfg config.SMTPConfig, mailDB db.MailDB, p *pipeline.Pipeline)
 			return nil, fmt.Errorf("failed to load TLS key pair: %w", err)
 		}
 		tlsConfig = &tls.Config{Certificates: []tls.Certificate{cert}}
+	} else {
+		slog.Warn("no smtp tls certificates provided, STARTTLS will not be available")
 	}
 
 	for _, port := range cfg.Ports {
@@ -143,6 +145,9 @@ func StartServers(cfg config.SMTPConfig, mailDB db.MailDB, p *pipeline.Pipeline)
 		s.MaxRecipients = cfg.MaxRecipients
 		s.AllowInsecureAuth = true
 		s.TLSConfig = tlsConfig
+
+		// If port is 465, typically it's implicit TLS, but go-smtp handles it via ListenAndServeTLS
+		// For now we attach the config to all, and EHLO will advertise STARTTLS if config is set.
 
 		servers = append(servers, s)
 	}
