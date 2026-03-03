@@ -1,7 +1,7 @@
 package outbound
 
 import (
-	"context"
+	"bytes"
 	"crypto/tls"
 	"fmt"
 	"io"
@@ -10,7 +10,6 @@ import (
 	"net/smtp"
 	"strings"
 	"time"
-	"bytes"
 
 	"github.com/emersion/go-message/mail"
 )
@@ -22,17 +21,17 @@ type Attachment struct {
 }
 
 type Message struct {
-	From     string
-	To       []string
-	Subject  string
-	TextBody string
-	HTMLBody string
+	From        string
+	To          []string
+	Subject     string
+	TextBody    string
+	HTMLBody    string
 	Attachments []Attachment
 }
 
 type Sender interface {
-	Send(ctx context.Context, from string, to []string, msg []byte) error
-	SendMessage(ctx context.Context, msg Message) ([]byte, error)
+	Send(from string, to []string, msg []byte) error
+	SendMessage(msg Message) ([]byte, error)
 }
 
 type MTA struct {
@@ -46,11 +45,11 @@ func NewMTA(hostname string) *MTA {
 	return &MTA{hostname: hostname}
 }
 
-func (m *MTA) SendMessage(ctx context.Context, msg Message) ([]byte, error) {
+func (m *MTA) SendMessage(msg Message) ([]byte, error) {
 	var buf bytes.Buffer
 	var h mail.Header
 	h.SetAddressList("From", []*mail.Address{{Address: msg.From}})
-	
+
 	toAddrs := make([]*mail.Address, len(msg.To))
 	for i, a := range msg.To {
 		toAddrs[i] = &mail.Address{Address: a}
@@ -95,7 +94,7 @@ func (m *MTA) SendMessage(ctx context.Context, msg Message) ([]byte, error) {
 		} else {
 			ah.Set("Content-Type", "application/octet-stream")
 		}
-		
+
 		aw, err := mw.CreateAttachment(ah)
 		if err != nil {
 			slog.Error("failed to create attachment part", "filename", att.Filename, "error", err)
@@ -108,14 +107,14 @@ func (m *MTA) SendMessage(ctx context.Context, msg Message) ([]byte, error) {
 	mw.Close()
 
 	raw := buf.Bytes()
-	if err := m.Send(ctx, msg.From, msg.To, raw); err != nil {
+	if err := m.Send(msg.From, msg.To, raw); err != nil {
 		return nil, err
 	}
-	
+
 	return raw, nil
 }
 
-func (m *MTA) Send(ctx context.Context, from string, to []string, msg []byte) error {
+func (m *MTA) Send(from string, to []string, msg []byte) error {
 	domains := make(map[string][]string)
 	for _, rcpt := range to {
 		parts := strings.Split(rcpt, "@")
@@ -129,7 +128,7 @@ func (m *MTA) Send(ctx context.Context, from string, to []string, msg []byte) er
 
 	var errs []error
 	for domain, recipients := range domains {
-		if err := m.deliverToDomain(ctx, domain, from, recipients, msg); err != nil {
+		if err := m.deliverToDomain(domain, from, recipients, msg); err != nil {
 			slog.Error("failed to deliver email", "domain", domain, "error", err)
 			errs = append(errs, err)
 		}
@@ -141,7 +140,7 @@ func (m *MTA) Send(ctx context.Context, from string, to []string, msg []byte) er
 	return nil
 }
 
-func (m *MTA) deliverToDomain(ctx context.Context, domain string, from string, to []string, msg []byte) error {
+func (m *MTA) deliverToDomain(domain string, from string, to []string, msg []byte) error {
 	mxs, err := net.LookupMX(domain)
 	if err != nil {
 		return fmt.Errorf("mx lookup failed: %w", err)

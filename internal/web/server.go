@@ -28,22 +28,22 @@ import (
 )
 
 type Server struct {
-	cfg      config.Config
-	db       db.WebDB
-	storage  storage.Storage
-	hub      *Hub
-	sender   outbound.Sender
-	mail     *mail.Service
+	cfg     config.Config
+	db      db.WebDB
+	storage storage.Storage
+	hub     *Hub
+	sender  outbound.Sender
+	mail    *mail.Service
 }
 
 func NewServer(cfg config.Config, webDB db.WebDB, storage storage.Storage, hub *Hub, sender outbound.Sender, mailSvc *mail.Service) *Server {
 	return &Server{
-		cfg:      cfg,
-		db:       webDB,
-		storage:  storage,
-		hub:      hub,
-		sender:   sender,
-		mail:     mailSvc,
+		cfg:     cfg,
+		db:      webDB,
+		storage: storage,
+		hub:     hub,
+		sender:  sender,
+		mail:    mailSvc,
 	}
 }
 
@@ -73,7 +73,7 @@ func (s *Server) Routes() chi.Router {
 		r.Post("/email/{emailID}/star", s.handleEmailStar)
 		r.Post("/email/{emailID}/delete", s.handleEmailDelete)
 		r.Get("/attachment/{attachmentID}", s.handleAttachmentDownload)
-		
+
 		r.Get("/compose", s.handleCompose)
 		r.Post("/send", s.handleEmailSend)
 	})
@@ -96,7 +96,7 @@ func (s *Server) handleCompose(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) handleEmailSend(w http.ResponseWriter, r *http.Request) {
 	user := r.Context().Value("user").(*models.User)
-	
+
 	if err := r.ParseMultipartForm(50 * 1024 * 1024); err != nil {
 		slog.Error("failed to parse multipart form", "error", err)
 		http.Error(w, "Failed to parse form", http.StatusBadRequest)
@@ -149,7 +149,7 @@ func (s *Server) handleEmailSend(w http.ResponseWriter, r *http.Request) {
 		})
 	}
 
-	rawBytes, err := s.sender.SendMessage(r.Context(), outMsg)
+	rawBytes, err := s.sender.SendMessage(outMsg)
 	if err != nil {
 		slog.Error("failed to send email via MTA", "user_id", user.ID, "error", err)
 		http.Error(w, "Failed to send email", http.StatusInternalServerError)
@@ -327,7 +327,7 @@ func (s *Server) handleEmailStar(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Invalid ID", http.StatusBadRequest)
 		return
 	}
-	
+
 	email, err := s.db.GetEmailByIDForUser(r.Context(), emailID, user.ID)
 	if err != nil {
 		slog.Error("failed to fetch email for star", "email_id", emailID, "user_id", user.ID, "error", err)
@@ -352,7 +352,7 @@ func (s *Server) handleEmailStar(w http.ResponseWriter, r *http.Request) {
 		slog.Error("failed to fetch body", "key", email.StorageKey, "error", err)
 	}
 	email.IsStar = starred
-	
+
 	templates.EmailDetail(email, attachments, content, isHTML).Render(r.Context(), w)
 }
 
@@ -363,7 +363,7 @@ func (s *Server) handleEmailDelete(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Invalid ID", http.StatusBadRequest)
 		return
 	}
-	
+
 	email, err := s.db.GetEmailByIDForUser(r.Context(), emailID, user.ID)
 	if err != nil {
 		slog.Error("failed to fetch email for delete", "email_id", emailID, "user_id", user.ID, "error", err)
@@ -398,7 +398,7 @@ func (s *Server) handleEmailHeaders(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Not found", http.StatusNotFound)
 		return
 	}
-	
+
 	headers, err := s.mail.FetchHeaders(r.Context(), email)
 	if err != nil {
 		slog.Error("failed to fetch headers", "key", email.StorageKey, "error", err)
