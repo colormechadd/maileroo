@@ -55,6 +55,8 @@ type PersistOptions struct {
 	SendingAddressID *uuid.UUID
 	InReplyTo        string
 	References       string
+	Cc               string
+	Bcc              string
 }
 
 func (s *Service) Persist(ctx context.Context, opts PersistOptions) (*models.Email, error) {
@@ -214,6 +216,35 @@ func (s *Service) Persist(ctx context.Context, opts PersistOptions) (*models.Ema
 	}
 
 	return email, nil
+}
+
+func (s *Service) GetCcAddresses(ctx context.Context, email *models.Email) ([]string, error) {
+	rc, err := s.storage.Get(ctx, email.StorageKey)
+	if err != nil {
+		return nil, err
+	}
+	defer rc.Close()
+
+	bodyReader, err := s.DecompressReader(rc, email.StorageKey)
+	if err != nil {
+		return nil, err
+	}
+	if closer, ok := bodyReader.(io.Closer); ok {
+		defer closer.Close()
+	}
+
+	mr, err := gomail.CreateReader(bodyReader)
+	if err != nil {
+		return nil, err
+	}
+	defer mr.Close()
+
+	ccAddrs, _ := mr.Header.AddressList("Cc")
+	var res []string
+	for _, a := range ccAddrs {
+		res = append(res, a.Address)
+	}
+	return res, nil
 }
 
 func (s *Service) FetchBody(ctx context.Context, email *models.Email) (string, bool, error) {

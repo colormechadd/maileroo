@@ -94,6 +94,8 @@ func (s *Server) handleCompose(w http.ResponseWriter, r *http.Request) {
 	replyToIDRaw := r.URL.Query().Get("replyTo")
 	fromID := ""
 	to := ""
+	cc := ""
+	bcc := ""
 	subject := ""
 	inReplyTo := ""
 	references := ""
@@ -116,6 +118,12 @@ func (s *Server) handleCompose(w http.ResponseWriter, r *http.Request) {
 				}
 				references = strings.TrimSpace(origRefs + " " + orig.MessageID)
 
+				// Keep existing CCs
+				ccList, _ := s.mail.GetCcAddresses(r.Context(), orig)
+				if len(ccList) > 0 {
+					cc = strings.Join(ccList, ", ")
+				}
+
 				// Find matching from address
 				for _, addr := range addresses {
 					if strings.EqualFold(addr.Address, orig.ToAddress) {
@@ -128,7 +136,7 @@ func (s *Server) handleCompose(w http.ResponseWriter, r *http.Request) {
 	}
 
 	mailboxes, _ := s.db.GetMailboxesByUserID(r.Context(), user.ID)
-	s.render(w, r, user, mailboxes, uuid.Nil, "all", templates.Compose(addresses, fromID, to, subject, inReplyTo, references))
+	s.render(w, r, user, mailboxes, uuid.Nil, "all", templates.Compose(addresses, fromID, to, cc, bcc, subject, inReplyTo, references))
 }
 
 func (s *Server) handleEmailSend(w http.ResponseWriter, r *http.Request) {
@@ -142,6 +150,8 @@ func (s *Server) handleEmailSend(w http.ResponseWriter, r *http.Request) {
 
 	fromIDRaw := r.FormValue("from_id")
 	toRaw := r.FormValue("to")
+	ccRaw := r.FormValue("cc")
+	bccRaw := r.FormValue("bcc")
 	subject := r.FormValue("subject")
 	body := r.FormValue("body")
 	bodyHTML := r.FormValue("body_html")
@@ -161,14 +171,15 @@ func (s *Server) handleEmailSend(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	to := strings.Split(toRaw, ",")
-	for i := range to {
-		to[i] = strings.TrimSpace(to[i])
-	}
+	to := parseAddresses(toRaw)
+	cc := parseAddresses(ccRaw)
+	bcc := parseAddresses(bccRaw)
 
 	outMsg := outbound.Message{
 		From:       sa.Address,
 		To:         to,
+		Cc:         cc,
+		Bcc:        bcc,
 		Subject:    subject,
 		TextBody:   body,
 		HTMLBody:   bodyHTML,
@@ -207,6 +218,8 @@ func (s *Server) handleEmailSend(w http.ResponseWriter, r *http.Request) {
 			SendingAddressID: &sa.ID,
 			InReplyTo:        inReplyTo,
 			References:       references,
+			Cc:               ccRaw,
+			Bcc:              bccRaw,
 		})
 		if err != nil {
 			slog.Error("failed to persist outbound email", "user_id", user.ID, "error", err)
@@ -657,4 +670,19 @@ func generateToken() string {
 	b := make([]byte, 32)
 	rand.Read(b)
 	return hex.EncodeToString(b)
+}
+
+func parseAddresses(raw string) []string {
+	if raw == "" {
+		return nil
+	}
+	parts := strings.Split(raw, ",")
+	var res []string
+	for _, p := range parts {
+		trimmed := strings.TrimSpace(p)
+		if trimmed != "" {
+			res = append(res, trimmed)
+		}
+	}
+	return res
 }

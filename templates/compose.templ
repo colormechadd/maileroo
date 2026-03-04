@@ -1,33 +1,13 @@
 package templates
 
 import (
+	"fmt"
 	"github.com/colormechadd/maileroo/pkg/models"
 )
 
-templ Compose(addresses []models.SendingAddress, fromID, to, subject, inReplyTo, references string) {
+templ Compose(addresses []models.SendingAddress, fromID, to, cc, bcc, subject, inReplyTo, references string) {
 	<div class="flex-1 flex flex-col h-full bg-white overflow-hidden animate-in slide-in-from-bottom-4 duration-300" 
-		 x-data="{ 
-			sending: false, 
-			attachments: [], 
-			isHTML: true,
-			handleFiles(files) {
-				Array.from(files).forEach(file => {
-					if (!this.attachments.find(a => a.name === file.name && a.size === file.size)) {
-						this.attachments.push(file);
-					}
-				});
-				this.syncFiles();
-			},
-			removeFile(index) {
-				this.attachments.splice(index, 1);
-				this.syncFiles();
-			},
-			syncFiles() {
-				const dt = new DataTransfer();
-				this.attachments.forEach(file => dt.items.add(file));
-				this.$refs.fileInput.files = dt.files;
-			}
-		 }">
+		 x-data={ fmt.Sprintf("{ sending: false, attachments: [], isHTML: true, showCc: %v, showBcc: %v, handleFiles(files) { Array.from(files).forEach(file => { if (!this.attachments.find(a => a.name === file.name && a.size === file.size)) { this.attachments.push(file); } }); this.syncFiles(); }, removeFile(index) { this.attachments.splice(index, 1); this.syncFiles(); }, syncFiles() { const dt = new DataTransfer(); this.attachments.forEach(file => dt.items.add(file)); this.$refs.fileInput.files = dt.files; } }", cc != "", bcc != "") }>
 		<header class="h-16 border-b border-purple-100 flex items-center justify-between px-8 bg-white/80 backdrop-blur-sm sticky top-0 z-10">
 			<div class="flex items-center space-x-4">
 				<h2 class="text-lg font-bold text-gray-900 uppercase tracking-tight">New Message</h2>
@@ -90,17 +70,51 @@ templ Compose(addresses []models.SendingAddress, fromID, to, subject, inReplyTo,
 						</div>
 
 						<!-- To Address -->
-						<div>
-							<label for="to" class="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2 px-1">To</label>
-							<input 
-								type="text" 
-								id="to" 
-								name="to" 
-								required
-								value={ to }
-								placeholder="recipient@example.com"
-								class="block w-full bg-gray-50 border-0 border-b-2 border-transparent focus:border-purple-500 focus:bg-white focus:ring-0 rounded-t-lg px-4 py-3 text-gray-900 transition-all font-medium"
-							/>
+						<div class="space-y-4">
+							<div>
+								<div class="flex items-center justify-between mb-2 px-1">
+									<label for="to" class="block text-xs font-bold text-gray-500 uppercase tracking-wider">To</label>
+									<div class="flex space-x-2">
+										<button type="button" @click="showCc = !showCc" class="text-[10px] font-bold text-purple-600 hover:text-purple-700 uppercase tracking-widest cursor-pointer">Cc</button>
+										<button type="button" @click="showBcc = !showBcc" class="text-[10px] font-bold text-purple-600 hover:text-purple-700 uppercase tracking-widest cursor-pointer">Bcc</button>
+									</div>
+								</div>
+								<input 
+									type="text" 
+									id="to" 
+									name="to" 
+									required
+									value={ to }
+									placeholder="recipient@example.com"
+									class="block w-full bg-gray-50 border-0 border-b-2 border-transparent focus:border-purple-500 focus:bg-white focus:ring-0 rounded-t-lg px-4 py-3 text-gray-900 transition-all font-medium"
+								/>
+							</div>
+
+							<!-- Cc Address -->
+							<div x-show="showCc" x-cloak>
+								<label for="cc" class="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2 px-1">Cc</label>
+								<input 
+									type="text" 
+									id="cc" 
+									name="cc" 
+									value={ cc }
+									placeholder="cc@example.com"
+									class="block w-full bg-gray-50 border-0 border-b-2 border-transparent focus:border-purple-500 focus:bg-white focus:ring-0 rounded-t-lg px-4 py-3 text-gray-900 transition-all font-medium"
+								/>
+							</div>
+
+							<!-- Bcc Address -->
+							<div x-show="showBcc" x-cloak>
+								<label for="bcc" class="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2 px-1">Bcc</label>
+								<input 
+									type="text" 
+									id="bcc" 
+									name="bcc" 
+									value={ bcc }
+									placeholder="bcc@example.com"
+									class="block w-full bg-gray-50 border-0 border-b-2 border-transparent focus:border-purple-500 focus:bg-white focus:ring-0 rounded-t-lg px-4 py-3 text-gray-900 transition-all font-medium"
+								/>
+							</div>
 						</div>
 
 						<!-- Subject -->

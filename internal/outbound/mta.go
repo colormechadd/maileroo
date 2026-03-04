@@ -23,6 +23,8 @@ type Attachment struct {
 type Message struct {
 	From        string
 	To          []string
+	Cc          []string
+	Bcc         []string
 	Subject     string
 	TextBody    string
 	HTMLBody    string
@@ -57,6 +59,15 @@ func (m *MTA) SendMessage(msg Message) ([]byte, error) {
 		toAddrs[i] = &mail.Address{Address: a}
 	}
 	h.SetAddressList("To", toAddrs)
+
+	if len(msg.Cc) > 0 {
+		ccAddrs := make([]*mail.Address, len(msg.Cc))
+		for i, a := range msg.Cc {
+			ccAddrs[i] = &mail.Address{Address: a}
+		}
+		h.SetAddressList("Cc", ccAddrs)
+	}
+
 	h.SetSubject(msg.Subject)
 	h.SetDate(time.Now())
 	h.Set("MIME-Version", "1.0")
@@ -116,7 +127,13 @@ func (m *MTA) SendMessage(msg Message) ([]byte, error) {
 	mw.Close()
 
 	raw := buf.Bytes()
-	if err := m.Send(msg.From, msg.To, raw); err != nil {
+	
+	// Collect all recipients for SMTP delivery (To + Cc + Bcc)
+	allRecipients := append([]string{}, msg.To...)
+	allRecipients = append(allRecipients, msg.Cc...)
+	allRecipients = append(allRecipients, msg.Bcc...)
+
+	if err := m.Send(msg.From, allRecipients, raw); err != nil {
 		return nil, err
 	}
 
