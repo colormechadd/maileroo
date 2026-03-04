@@ -53,6 +53,8 @@ type PersistOptions struct {
 	IngestionID      *uuid.UUID
 	AddressMappingID *uuid.UUID
 	SendingAddressID *uuid.UUID
+	InReplyTo        string
+	References       string
 }
 
 func (s *Service) Persist(ctx context.Context, opts PersistOptions) (*models.Email, error) {
@@ -146,6 +148,13 @@ func (s *Service) Persist(ctx context.Context, opts PersistOptions) (*models.Ema
 		IsStar:           false,
 		IsOutbound:       opts.IsOutbound,
 		IsQuarantined:    opts.IsQuarantined,
+	}
+
+	if opts.InReplyTo != "" {
+		email.InReplyTo = &opts.InReplyTo
+	}
+	if opts.References != "" {
+		email.References = &opts.References
 	}
 
 	if err := s.repo.CreateEmail(ctx, email); err != nil {

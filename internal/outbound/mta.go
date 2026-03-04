@@ -26,6 +26,8 @@ type Message struct {
 	Subject     string
 	TextBody    string
 	HTMLBody    string
+	InReplyTo   string
+	References  string
 	Attachments []Attachment
 }
 
@@ -58,6 +60,13 @@ func (m *MTA) SendMessage(msg Message) ([]byte, error) {
 	h.SetSubject(msg.Subject)
 	h.SetDate(time.Now())
 	h.Set("MIME-Version", "1.0")
+
+	if msg.InReplyTo != "" {
+		h.Set("In-Reply-To", msg.InReplyTo)
+	}
+	if msg.References != "" {
+		h.Set("References", msg.References)
+	}
 
 	mw, err := mail.CreateWriter(&buf, h)
 	if err != nil {

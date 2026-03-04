@@ -52,6 +52,16 @@ templ EmailDetail(email *models.Email, attachments []models.EmailAttachment, bod
 							}
 						</svg>
 					</button>
+
+					<button 
+						class="text-xs font-bold uppercase tracking-widest text-purple-600 bg-purple-50 hover:bg-purple-100 px-3 py-1.5 rounded-lg transition-colors cursor-pointer"
+						hx-get={ "/compose?replyTo=" + email.ID.String() }
+						hx-target="#main-content"
+						hx-push-url="true"
+					>
+						Reply
+					</button>
+
 					if email.IsQuarantined {
 						<button 
 							class="text-xs font-bold uppercase tracking-widest text-teal-600 bg-teal-50 hover:bg-teal-100 px-3 py-1.5 rounded-lg transition-colors cursor-pointer"

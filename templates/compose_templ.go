@@ -12,7 +12,7 @@ import (
 	"github.com/colormechadd/maileroo/pkg/models"
 )
 
-func Compose(addresses []models.SendingAddress) templ.Component {
+func Compose(addresses []models.SendingAddress, fromID, to, subject, inReplyTo, references string) templ.Component {
 	return templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
 		templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
 		if templ_7745c5c3_CtxErr := ctx.Err(); templ_7745c5c3_CtxErr != nil {
@@ -51,25 +51,87 @@ func Compose(addresses []models.SendingAddress) templ.Component {
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 3, "\">")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 3, "\"")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			if addr.ID.String() == fromID {
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 4, " selected")
+				if templ_7745c5c3_Err != nil {
+					return templ_7745c5c3_Err
+				}
+			}
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 5, ">")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 			var templ_7745c5c3_Var3 string
 			templ_7745c5c3_Var3, templ_7745c5c3_Err = templ.JoinStringErrs(addr.Address)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `templates/compose.templ`, Line: 81, Col: 59}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `templates/compose.templ`, Line: 81, Col: 100}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var3))
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 4, "</option>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 6, "</option>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 5, "</select><div class=\"pointer-events-none absolute inset-y-0 right-0 flex items-center px-4 text-gray-400\"><svg class=\"h-4 w-4\" fill=\"none\" viewBox=\"0 0 24 24\" stroke=\"currentColor\"><path stroke-linecap=\"round\" stroke-linejoin=\"round\" stroke-width=\"2\" d=\"M19 9l-7 7-7-7\"></path></svg></div></div></div><!-- To Address --><div><label for=\"to\" class=\"block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2 px-1\">To</label> <input type=\"text\" id=\"to\" name=\"to\" required placeholder=\"recipient@example.com\" class=\"block w-full bg-gray-50 border-0 border-b-2 border-transparent focus:border-purple-500 focus:bg-white focus:ring-0 rounded-t-lg px-4 py-3 text-gray-900 transition-all font-medium\"></div><!-- Subject --><div><label for=\"subject\" class=\"block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2 px-1\">Subject</label> <input type=\"text\" id=\"subject\" name=\"subject\" required placeholder=\"Enter subject...\" class=\"block w-full bg-gray-50 border-0 border-b-2 border-transparent focus:border-purple-500 focus:bg-white focus:ring-0 rounded-t-lg px-4 py-3 text-gray-900 transition-all font-medium\"></div><!-- Body --><div class=\"space-y-2\"><label for=\"body\" class=\"block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2 px-1\"><span x-show=\"!isHTML\">Message (Plain Text)</span> <span x-show=\"isHTML\">Message (Rich Text)</span></label><!-- Rich Text Editor (Trix) --><div x-show=\"isHTML\" class=\"border border-purple-100 focus-within:border-purple-500 transition-all rounded-xl bg-white overflow-hidden shadow-sm\"><input id=\"body_html\" type=\"hidden\" name=\"body_html\"> <trix-editor input=\"body_html\" class=\"trix-content outline-none font-sans text-gray-800 leading-relaxed\"></trix-editor></div><!-- Plain Text Fallback --><div x-show=\"!isHTML\"><textarea id=\"body\" name=\"body\" rows=\"12\" :required=\"!isHTML\" placeholder=\"Write your message here...\" class=\"block w-full bg-gray-50 border-0 border-b-2 border-transparent focus:border-purple-500 focus:bg-white focus:ring-0 rounded-t-lg px-4 py-4 text-gray-900 transition-all resize-none font-sans leading-relaxed\"></textarea></div></div><!-- Attachments --><div><label class=\"block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2 px-1\">Attachments</label><div class=\"space-y-4\"><div class=\"flex items-center justify-center w-full\"><label class=\"flex flex-col items-center justify-center w-full h-32 border-2 border-purple-100 border-dashed rounded-xl cursor-pointer bg-gray-50 hover:bg-purple-50 transition-colors\"><div class=\"flex flex-col items-center justify-center pt-5 pb-6\"><svg class=\"w-8 h-8 mb-3 text-purple-400\" fill=\"none\" viewBox=\"0 0 24 24\" stroke=\"currentColor\"><path stroke-linecap=\"round\" stroke-linejoin=\"round\" stroke-width=\"2\" d=\"M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12\"></path></svg><p class=\"mb-2 text-sm text-gray-500\"><span class=\"font-bold text-purple-600\">Click to upload</span> or drag and drop</p><p class=\"text-xs text-gray-400\">Any file up to 50MB</p></div><input type=\"file\" name=\"attachments\" x-ref=\"fileInput\" class=\"hidden\" multiple @change=\"handleFiles($event.target.files)\"></label></div><template x-if=\"attachments.length > 0\"><div class=\"flex flex-wrap gap-2\"><template x-for=\"(file, index) in attachments\" :key=\"file.name + file.lastModified\"><div class=\"flex items-center bg-purple-50 text-purple-700 px-3 py-1.5 rounded-lg border border-purple-100 text-sm font-medium animate-in zoom-in-95 duration-200 group\"><svg class=\"w-4 h-4 mr-2\" fill=\"none\" viewBox=\"0 0 24 24\" stroke=\"currentColor\"><path stroke-linecap=\"round\" stroke-linejoin=\"round\" stroke-width=\"2\" d=\"M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13\"></path></svg> <span x-text=\"file.name\"></span> <span class=\"ml-2 text-[10px] text-purple-400 uppercase\" x-text=\"(file.size / 1024).toFixed(1) + ' KB'\"></span> <button type=\"button\" @click=\"removeFile(index)\" class=\"ml-3 text-purple-300 hover:text-red-500 transition-colors cursor-pointer\" title=\"Remove attachment\"><svg class=\"w-4 h-4\" fill=\"none\" viewBox=\"0 0 24 24\" stroke=\"currentColor\"><path stroke-linecap=\"round\" stroke-linejoin=\"round\" stroke-width=\"2\" d=\"M6 18L18 6M6 6l12 12\"></path></svg></button></div></template></div></template></div></div></div><div class=\"pt-4 flex items-center justify-between\"><div class=\"flex items-center text-gray-400 text-sm italic\" x-show=\"sending\" x-cloak><svg class=\"animate-spin -ml-1 mr-3 h-5 w-5 text-purple-500\" fill=\"none\" viewBox=\"0 0 24 24\"><circle class=\"opacity-25\" cx=\"12\" cy=\"12\" r=\"10\" stroke=\"currentColor\" stroke-width=\"4\"></circle> <path class=\"opacity-75\" fill=\"currentColor\" d=\"M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z\"></path></svg> Sending message...</div><div x-show=\"!sending\" class=\"flex-1\"></div><div class=\"flex space-x-4\"><button type=\"submit\" x-bind:disabled=\"sending\" class=\"inline-flex items-center px-8 py-3 bg-teal-500 hover:bg-teal-600 disabled:bg-gray-300 text-white rounded-xl font-bold shadow-lg shadow-teal-100 transition-all cursor-pointer group\"><span x-show=\"!sending\">Send Message</span> <span x-show=\"sending\">Sending...</span> <svg class=\"ml-2 h-5 w-5 group-hover:translate-x-1 transition-transform\" fill=\"none\" viewBox=\"0 0 24 24\" stroke=\"currentColor\" x-show=\"!sending\"><path stroke-linecap=\"round\" stroke-linejoin=\"round\" stroke-width=\"2\" d=\"M14 5l7 7m0 0l-7 7m7-7H3\"></path></svg></button></div></div></form></div></div></div>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 7, "</select><div class=\"pointer-events-none absolute inset-y-0 right-0 flex items-center px-4 text-gray-400\"><svg class=\"h-4 w-4\" fill=\"none\" viewBox=\"0 0 24 24\" stroke=\"currentColor\"><path stroke-linecap=\"round\" stroke-linejoin=\"round\" stroke-width=\"2\" d=\"M19 9l-7 7-7-7\"></path></svg></div></div></div><!-- To Address --><div><label for=\"to\" class=\"block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2 px-1\">To</label> <input type=\"text\" id=\"to\" name=\"to\" required value=\"")
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		var templ_7745c5c3_Var4 string
+		templ_7745c5c3_Var4, templ_7745c5c3_Err = templ.JoinStringErrs(to)
+		if templ_7745c5c3_Err != nil {
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `templates/compose.templ`, Line: 100, Col: 18}
+		}
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var4))
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 8, "\" placeholder=\"recipient@example.com\" class=\"block w-full bg-gray-50 border-0 border-b-2 border-transparent focus:border-purple-500 focus:bg-white focus:ring-0 rounded-t-lg px-4 py-3 text-gray-900 transition-all font-medium\"></div><!-- Subject --><div><label for=\"subject\" class=\"block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2 px-1\">Subject</label> <input type=\"text\" id=\"subject\" name=\"subject\" required value=\"")
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		var templ_7745c5c3_Var5 string
+		templ_7745c5c3_Var5, templ_7745c5c3_Err = templ.JoinStringErrs(subject)
+		if templ_7745c5c3_Err != nil {
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `templates/compose.templ`, Line: 114, Col: 23}
+		}
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var5))
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 9, "\" placeholder=\"Enter subject...\" class=\"block w-full bg-gray-50 border-0 border-b-2 border-transparent focus:border-purple-500 focus:bg-white focus:ring-0 rounded-t-lg px-4 py-3 text-gray-900 transition-all font-medium\"></div><input type=\"hidden\" name=\"in_reply_to\" value=\"")
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		var templ_7745c5c3_Var6 string
+		templ_7745c5c3_Var6, templ_7745c5c3_Err = templ.JoinStringErrs(inReplyTo)
+		if templ_7745c5c3_Err != nil {
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `templates/compose.templ`, Line: 120, Col: 63}
+		}
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var6))
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 10, "\"> <input type=\"hidden\" name=\"references\" value=\"")
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		var templ_7745c5c3_Var7 string
+		templ_7745c5c3_Var7, templ_7745c5c3_Err = templ.JoinStringErrs(references)
+		if templ_7745c5c3_Err != nil {
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `templates/compose.templ`, Line: 121, Col: 63}
+		}
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var7))
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 11, "\"><!-- Body --><div class=\"space-y-2\"><label for=\"body\" class=\"block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2 px-1\"><span x-show=\"!isHTML\">Message (Plain Text)</span> <span x-show=\"isHTML\">Message (Rich Text)</span></label><!-- Rich Text Editor (Trix) --><div x-show=\"isHTML\" class=\"border border-purple-100 focus-within:border-purple-500 transition-all rounded-xl bg-white overflow-hidden shadow-sm\"><input id=\"body_html\" type=\"hidden\" name=\"body_html\"> <trix-editor input=\"body_html\" class=\"trix-content outline-none font-sans text-gray-800 leading-relaxed\"></trix-editor></div><!-- Plain Text Fallback --><div x-show=\"!isHTML\"><textarea id=\"body\" name=\"body\" rows=\"12\" :required=\"!isHTML\" placeholder=\"Write your message here...\" class=\"block w-full bg-gray-50 border-0 border-b-2 border-transparent focus:border-purple-500 focus:bg-white focus:ring-0 rounded-t-lg px-4 py-4 text-gray-900 transition-all resize-none font-sans leading-relaxed\"></textarea></div></div><!-- Attachments --><div><label class=\"block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2 px-1\">Attachments</label><div class=\"space-y-4\"><div class=\"flex items-center justify-center w-full\"><label class=\"flex flex-col items-center justify-center w-full h-32 border-2 border-purple-100 border-dashed rounded-xl cursor-pointer bg-gray-50 hover:bg-purple-50 transition-colors\"><div class=\"flex flex-col items-center justify-center pt-5 pb-6\"><svg class=\"w-8 h-8 mb-3 text-purple-400\" fill=\"none\" viewBox=\"0 0 24 24\" stroke=\"currentColor\"><path stroke-linecap=\"round\" stroke-linejoin=\"round\" stroke-width=\"2\" d=\"M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12\"></path></svg><p class=\"mb-2 text-sm text-gray-500\"><span class=\"font-bold text-purple-600\">Click to upload</span> or drag and drop</p><p class=\"text-xs text-gray-400\">Any file up to 50MB</p></div><input type=\"file\" name=\"attachments\" x-ref=\"fileInput\" class=\"hidden\" multiple @change=\"handleFiles($event.target.files)\"></label></div><template x-if=\"attachments.length > 0\"><div class=\"flex flex-wrap gap-2\"><template x-for=\"(file, index) in attachments\" :key=\"file.name + file.lastModified\"><div class=\"flex items-center bg-purple-50 text-purple-700 px-3 py-1.5 rounded-lg border border-purple-100 text-sm font-medium animate-in zoom-in-95 duration-200 group\"><svg class=\"w-4 h-4 mr-2\" fill=\"none\" viewBox=\"0 0 24 24\" stroke=\"currentColor\"><path stroke-linecap=\"round\" stroke-linejoin=\"round\" stroke-width=\"2\" d=\"M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13\"></path></svg> <span x-text=\"file.name\"></span> <span class=\"ml-2 text-[10px] text-purple-400 uppercase\" x-text=\"(file.size / 1024).toFixed(1) + ' KB'\"></span> <button type=\"button\" @click=\"removeFile(index)\" class=\"ml-3 text-purple-300 hover:text-red-500 transition-colors cursor-pointer\" title=\"Remove attachment\"><svg class=\"w-4 h-4\" fill=\"none\" viewBox=\"0 0 24 24\" stroke=\"currentColor\"><path stroke-linecap=\"round\" stroke-linejoin=\"round\" stroke-width=\"2\" d=\"M6 18L18 6M6 6l12 12\"></path></svg></button></div></template></div></template></div></div></div><div class=\"pt-4 flex items-center justify-between\"><div class=\"flex items-center text-gray-400 text-sm italic\" x-show=\"sending\" x-cloak><svg class=\"animate-spin -ml-1 mr-3 h-5 w-5 text-purple-500\" fill=\"none\" viewBox=\"0 0 24 24\"><circle class=\"opacity-25\" cx=\"12\" cy=\"12\" r=\"10\" stroke=\"currentColor\" stroke-width=\"4\"></circle> <path class=\"opacity-75\" fill=\"currentColor\" d=\"M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z\"></path></svg> Sending message...</div><div x-show=\"!sending\" class=\"flex-1\"></div><div class=\"flex space-x-4\"><button type=\"submit\" x-bind:disabled=\"sending\" class=\"inline-flex items-center px-8 py-3 bg-teal-500 hover:bg-teal-600 disabled:bg-gray-300 text-white rounded-xl font-bold shadow-lg shadow-teal-100 transition-all cursor-pointer group\"><span x-show=\"!sending\">Send Message</span> <span x-show=\"sending\">Sending...</span> <svg class=\"ml-2 h-5 w-5 group-hover:translate-x-1 transition-transform\" fill=\"none\" viewBox=\"0 0 24 24\" stroke=\"currentColor\" x-show=\"!sending\"><path stroke-linecap=\"round\" stroke-linejoin=\"round\" stroke-width=\"2\" d=\"M14 5l7 7m0 0l-7 7m7-7H3\"></path></svg></button></div></div></form></div></div></div>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}

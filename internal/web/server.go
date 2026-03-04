@@ -91,8 +91,44 @@ func (s *Server) handleCompose(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	replyToIDRaw := r.URL.Query().Get("replyTo")
+	fromID := ""
+	to := ""
+	subject := ""
+	inReplyTo := ""
+	references := ""
+
+	if replyToIDRaw != "" {
+		replyToID, err := uuid.Parse(replyToIDRaw)
+		if err == nil {
+			orig, err := s.db.GetEmailByIDForUser(r.Context(), replyToID, user.ID)
+			if err == nil {
+				to = orig.FromAddress
+				subject = orig.Subject
+				if !strings.HasPrefix(strings.ToLower(subject), "re:") {
+					subject = "Re: " + subject
+				}
+				inReplyTo = orig.MessageID
+				
+				origRefs := ""
+				if orig.References != nil {
+					origRefs = *orig.References
+				}
+				references = strings.TrimSpace(origRefs + " " + orig.MessageID)
+
+				// Find matching from address
+				for _, addr := range addresses {
+					if strings.EqualFold(addr.Address, orig.ToAddress) {
+						fromID = addr.ID.String()
+						break
+					}
+				}
+			}
+		}
+	}
+
 	mailboxes, _ := s.db.GetMailboxesByUserID(r.Context(), user.ID)
-	s.render(w, r, user, mailboxes, uuid.Nil, "all", templates.Compose(addresses))
+	s.render(w, r, user, mailboxes, uuid.Nil, "all", templates.Compose(addresses, fromID, to, subject, inReplyTo, references))
 }
 
 func (s *Server) handleEmailSend(w http.ResponseWriter, r *http.Request) {
@@ -109,6 +145,8 @@ func (s *Server) handleEmailSend(w http.ResponseWriter, r *http.Request) {
 	subject := r.FormValue("subject")
 	body := r.FormValue("body")
 	bodyHTML := r.FormValue("body_html")
+	inReplyTo := r.FormValue("in_reply_to")
+	references := r.FormValue("references")
 
 	fromID, err := uuid.Parse(fromIDRaw)
 	if err != nil {
@@ -129,11 +167,13 @@ func (s *Server) handleEmailSend(w http.ResponseWriter, r *http.Request) {
 	}
 
 	outMsg := outbound.Message{
-		From:     sa.Address,
-		To:       to,
-		Subject:  subject,
-		TextBody: body,
-		HTMLBody: bodyHTML,
+		From:       sa.Address,
+		To:         to,
+		Subject:    subject,
+		TextBody:   body,
+		HTMLBody:   bodyHTML,
+		InReplyTo:  inReplyTo,
+		References: references,
 	}
 
 	files := r.MultipartForm.File["attachments"]
@@ -165,6 +205,8 @@ func (s *Server) handleEmailSend(w http.ResponseWriter, r *http.Request) {
 			IsOutbound:       true,
 			UserID:           user.ID,
 			SendingAddressID: &sa.ID,
+			InReplyTo:        inReplyTo,
+			References:       references,
 		})
 		if err != nil {
 			slog.Error("failed to persist outbound email", "user_id", user.ID, "error", err)

@@ -4,7 +4,7 @@ import (
 	"github.com/colormechadd/maileroo/pkg/models"
 )
 
-templ Compose(addresses []models.SendingAddress) {
+templ Compose(addresses []models.SendingAddress, fromID, to, subject, inReplyTo, references string) {
 	<div class="flex-1 flex flex-col h-full bg-white overflow-hidden animate-in slide-in-from-bottom-4 duration-300" 
 		 x-data="{ 
 			sending: false, 
@@ -78,7 +78,7 @@ templ Compose(addresses []models.SendingAddress) {
 									class="block w-full bg-gray-50 border-0 border-b-2 border-transparent focus:border-purple-500 focus:bg-white focus:ring-0 rounded-t-lg px-4 py-3 text-gray-900 transition-all cursor-pointer appearance-none font-medium"
 								>
 									for _, addr := range addresses {
-										<option value={ addr.ID.String() }>{ addr.Address }</option>
+										<option value={ addr.ID.String() } selected?={ addr.ID.String() == fromID }>{ addr.Address }</option>
 									}
 								</select>
 								<div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-4 text-gray-400">
@@ -97,6 +97,7 @@ templ Compose(addresses []models.SendingAddress) {
 								id="to" 
 								name="to" 
 								required
+								value={ to }
 								placeholder="recipient@example.com"
 								class="block w-full bg-gray-50 border-0 border-b-2 border-transparent focus:border-purple-500 focus:bg-white focus:ring-0 rounded-t-lg px-4 py-3 text-gray-900 transition-all font-medium"
 							/>
@@ -110,10 +111,14 @@ templ Compose(addresses []models.SendingAddress) {
 								id="subject" 
 								name="subject" 
 								required
+								value={ subject }
 								placeholder="Enter subject..."
 								class="block w-full bg-gray-50 border-0 border-b-2 border-transparent focus:border-purple-500 focus:bg-white focus:ring-0 rounded-t-lg px-4 py-3 text-gray-900 transition-all font-medium"
 							/>
 						</div>
+
+						<input type="hidden" name="in_reply_to" value={ inReplyTo } />
+						<input type="hidden" name="references" value={ references } />
 
 						<!-- Body -->
 						<div class="space-y-2">
