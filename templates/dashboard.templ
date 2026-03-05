@@ -109,7 +109,13 @@ templ Dashboard(user *models.User, mailboxes []models.Mailbox, currentMailboxID 
 								{ mb.Name }
 							</a>
 							
-							<div class="ml-8 space-y-1 pb-2" x-show={ "currentMailboxID === '" + mb.ID.String() + "'" } x-cloak>
+							<div 
+								class="ml-8 space-y-1 pb-2" 
+								x-show={ "currentMailboxID === '" + mb.ID.String() + "'" } 
+								if mb.ID != currentMailboxID {
+									style="display: none;"
+								}
+							>
 								@FilterLink(mb.ID, "all", "All")
 								@FilterLink(mb.ID, "unread", "Unread")
 								@FilterLink(mb.ID, "read", "Read")
