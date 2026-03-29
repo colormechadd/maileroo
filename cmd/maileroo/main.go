@@ -106,7 +106,7 @@ func runServe() {
 		}
 		dkimSigner = outbound.NewDKIMSigner(database, encKey)
 	}
-	mta := outbound.NewMTA(cfg.SMTP.Domain, dkimSigner)
+	mta := outbound.NewMTA(cfg.SMTP.Domain, cfg.SMTP.Relay, dkimSigner)
 
 	// Start SMTP servers
 	smtpServers, err := smtp.StartServers(cfg.SMTP, database, ingestionPipeline)

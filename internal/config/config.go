@@ -14,6 +14,7 @@ type SMTPConfig struct {
 	TLSCertFile    string        `mapstructure:"TLS_CERT_FILE"`
 	TLSKeyFile     string        `mapstructure:"TLS_KEY_FILE"`
 	Domain         string        `mapstructure:"DOMAIN"`
+	Relay          string        `mapstructure:"RELAY"` // Optional smarthost, e.g. "localhost:1025"
 	ReadTimeout    time.Duration `mapstructure:"READ_TIMEOUT"`
 	WriteTimeout   time.Duration `mapstructure:"WRITE_TIMEOUT"`
 	MaxMessageSize int64         `mapstructure:"MAX_MESSAGE_SIZE"`
