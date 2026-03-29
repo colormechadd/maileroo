@@ -121,6 +121,9 @@ func LoadConfig() (*Config, error) {
 	if key := viper.GetString("SMTP_TLS_KEY_FILE"); key != "" {
 		cfg.SMTP.TLSKeyFile = key
 	}
+	if relay := viper.GetString("SMTP_RELAY"); relay != "" {
+		cfg.SMTP.Relay = relay
+	}
 
 	return &cfg, nil
 }

@@ -50,6 +50,12 @@ func NewMTA(hostname string, relay string, dkim *DKIMSigner) *MTA {
 	if hostname == "" {
 		hostname = "localhost"
 	}
+
+	if relay != "" {
+		slog.Debug("Using MTA relay", "relay", relay)
+	} else {
+		slog.Debug("Using MTA host", "host", hostname)
+	}
 	return &MTA{hostname: hostname, relay: relay, dkim: dkim}
 }
 
