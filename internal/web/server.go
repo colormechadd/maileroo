@@ -7,6 +7,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"html"
 	"io"
 	"log/slog"
 	"net/http"
@@ -91,7 +92,6 @@ func (s *Server) handleCompose(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	replyToIDRaw := r.URL.Query().Get("replyTo")
 	fromID := ""
 	to := ""
 	cc := ""
@@ -99,32 +99,79 @@ func (s *Server) handleCompose(w http.ResponseWriter, r *http.Request) {
 	subject := ""
 	inReplyTo := ""
 	references := ""
+	title := "New Message"
+	body := ""
+	bodyHTML := ""
 
+	replyToIDRaw := r.URL.Query().Get("replyTo")
 	if replyToIDRaw != "" {
 		replyToID, err := uuid.Parse(replyToIDRaw)
 		if err == nil {
 			orig, err := s.db.GetEmailByIDForUser(r.Context(), replyToID, user.ID)
 			if err == nil {
+				title = "Reply"
 				to = orig.FromAddress
 				subject = orig.Subject
 				if !strings.HasPrefix(strings.ToLower(subject), "re:") {
 					subject = "Re: " + subject
 				}
 				inReplyTo = orig.MessageID
-				
+
 				origRefs := ""
 				if orig.References != nil {
 					origRefs = *orig.References
 				}
 				references = strings.TrimSpace(origRefs + " " + orig.MessageID)
 
-				// Keep existing CCs
 				ccList, _ := s.mail.GetCcAddresses(r.Context(), orig)
 				if len(ccList) > 0 {
 					cc = strings.Join(ccList, ", ")
 				}
 
-				// Find matching from address
+				for _, addr := range addresses {
+					if strings.EqualFold(addr.Address, orig.ToAddress) {
+						fromID = addr.ID.String()
+						break
+					}
+				}
+			}
+		}
+	}
+
+	forwardOfIDRaw := r.URL.Query().Get("forwardOf")
+	if forwardOfIDRaw != "" {
+		forwardID, err := uuid.Parse(forwardOfIDRaw)
+		if err == nil {
+			orig, err := s.db.GetEmailByIDForUser(r.Context(), forwardID, user.ID)
+			if err == nil {
+				title = "Forward"
+				subject = orig.Subject
+				if !strings.HasPrefix(strings.ToLower(subject), "fwd:") {
+					subject = "Fwd: " + subject
+				}
+
+				dateStr := orig.ReceiveDatetime.Format("Jan 02, 2006, 15:04")
+				origBody, origIsHTML, _ := s.mail.FetchBody(r.Context(), orig)
+
+				if origIsHTML {
+					headerHTML := fmt.Sprintf(
+						"<strong>---------- Forwarded message ----------</strong><br>From: %s<br>Date: %s<br>Subject: %s<br>To: %s<br><br>",
+						html.EscapeString(orig.FromAddress),
+						html.EscapeString(dateStr),
+						html.EscapeString(orig.Subject),
+						html.EscapeString(orig.ToAddress),
+					)
+					bodyHTML = fmt.Sprintf(
+						`<br><br><blockquote style="border-left:2px solid #ccc;margin:0;padding:0 0 0 0.75em">%s%s</blockquote>`,
+						headerHTML, origBody,
+					)
+				} else {
+					body = fmt.Sprintf(
+						"\n\n---------- Forwarded message ----------\nFrom: %s\nDate: %s\nSubject: %s\nTo: %s\n\n%s",
+						orig.FromAddress, dateStr, orig.Subject, orig.ToAddress, origBody,
+					)
+				}
+
 				for _, addr := range addresses {
 					if strings.EqualFold(addr.Address, orig.ToAddress) {
 						fromID = addr.ID.String()
@@ -136,7 +183,7 @@ func (s *Server) handleCompose(w http.ResponseWriter, r *http.Request) {
 	}
 
 	mailboxes, _ := s.db.GetMailboxesByUserID(r.Context(), user.ID)
-	s.render(w, r, user, mailboxes, uuid.Nil, "all", templates.Compose(addresses, fromID, to, cc, bcc, subject, inReplyTo, references))
+	s.render(w, r, user, mailboxes, uuid.Nil, "all", templates.Compose(addresses, fromID, to, cc, bcc, subject, inReplyTo, references, title, body, bodyHTML))
 }
 
 func (s *Server) handleEmailSend(w http.ResponseWriter, r *http.Request) {

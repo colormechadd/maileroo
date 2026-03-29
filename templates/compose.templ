@@ -5,12 +5,15 @@ import (
 	"github.com/colormechadd/maileroo/pkg/models"
 )
 
-templ Compose(addresses []models.SendingAddress, fromID, to, cc, bcc, subject, inReplyTo, references string) {
-	<div class="flex-1 flex flex-col h-full bg-white overflow-hidden animate-in slide-in-from-bottom-4 duration-300" 
-		 x-data={ fmt.Sprintf("{ sending: false, attachments: [], isHTML: true, showCc: %v, showBcc: %v, handleFiles(files) { Array.from(files).forEach(file => { if (!this.attachments.find(a => a.name === file.name && a.size === file.size)) { this.attachments.push(file); } }); this.syncFiles(); }, removeFile(index) { this.attachments.splice(index, 1); this.syncFiles(); }, syncFiles() { const dt = new DataTransfer(); this.attachments.forEach(file => dt.items.add(file)); this.$refs.fileInput.files = dt.files; } }", cc != "", bcc != "") }>
+templ Compose(addresses []models.SendingAddress, fromID, to, cc, bcc, subject, inReplyTo, references, title, body, bodyHTML string) {
+	{{
+		startIsHTML := bodyHTML != "" || body == ""
+	}}
+	<div class="flex-1 flex flex-col h-full bg-white overflow-hidden animate-in slide-in-from-bottom-4 duration-300"
+		 x-data={ fmt.Sprintf("{ sending: false, attachments: [], isHTML: %v, showCc: %v, showBcc: %v, handleFiles(files) { Array.from(files).forEach(file => { if (!this.attachments.find(a => a.name === file.name && a.size === file.size)) { this.attachments.push(file); } }); this.syncFiles(); }, removeFile(index) { this.attachments.splice(index, 1); this.syncFiles(); }, syncFiles() { const dt = new DataTransfer(); this.attachments.forEach(file => dt.items.add(file)); this.$refs.fileInput.files = dt.files; } }", startIsHTML, cc != "", bcc != "") }>
 		<header class="h-16 border-b border-purple-100 flex items-center justify-between px-8 bg-white/80 backdrop-blur-sm sticky top-0 z-10">
 			<div class="flex items-center space-x-4">
-				<h2 class="text-lg font-bold text-gray-900 uppercase tracking-tight">New Message</h2>
+				<h2 class="text-lg font-bold text-gray-900 uppercase tracking-tight">{ title }</h2>
 				<div class="flex items-center bg-gray-100 rounded-lg p-1 ml-4">
 					<button 
 						type="button"
@@ -144,19 +147,19 @@ templ Compose(addresses []models.SendingAddress, fromID, to, cc, bcc, subject, i
 							<!-- Rich Text Editor (Trix) -->
 							<div x-show="isHTML" class="border border-purple-100 focus-within:border-purple-500 transition-all rounded-xl bg-white overflow-hidden shadow-sm">
 								<input id="body_html" type="hidden" name="body_html"/>
-								<trix-editor input="body_html" class="trix-content outline-none font-sans text-gray-800 leading-relaxed"></trix-editor>
+								<trix-editor input="body_html" class="trix-content outline-none font-sans text-gray-800 leading-relaxed" data-forward-html={ bodyHTML } x-init="$el.addEventListener('trix-initialize', () => { const h = $el.dataset.forwardHtml; if (h) $el.editor.loadHTML(h) })"></trix-editor>
 							</div>
 
 							<!-- Plain Text Fallback -->
 							<div x-show="!isHTML">
-								<textarea 
-									id="body" 
-									name="body" 
-									rows="12" 
+								<textarea
+									id="body"
+									name="body"
+									rows="12"
 									:required="!isHTML"
 									placeholder="Write your message here..."
 									class="block w-full bg-gray-50 border-0 border-b-2 border-transparent focus:border-purple-500 focus:bg-white focus:ring-0 rounded-t-lg px-4 py-4 text-gray-900 transition-all resize-none font-sans leading-relaxed"
-								></textarea>
+								>{ body }</textarea>
 							</div>
 						</div>
 
