@@ -55,8 +55,6 @@ type PersistOptions struct {
 	SendingAddressID *uuid.UUID
 	InReplyTo        string
 	References       string
-	Cc               string
-	Bcc              string
 }
 
 func (s *Service) Persist(ctx context.Context, opts PersistOptions) (*models.Email, error) {

@@ -263,8 +263,6 @@ func (s *Server) handleEmailSend(w http.ResponseWriter, r *http.Request) {
 		SendingAddressID: &sa.ID,
 		InReplyTo:        inReplyTo,
 		References:       references,
-		Cc:               ccRaw,
-		Bcc:              bccRaw,
 	})
 	if err != nil {
 		slog.Error("failed to persist outbound email", "user_id", user.ID, "error", err)
