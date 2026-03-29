@@ -2,7 +2,9 @@ package outbound
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
+	"strings"
 	"time"
 
 	"github.com/colormechadd/maileroo/pkg/models"
@@ -63,8 +65,18 @@ func (q *Queue) process(ctx context.Context) {
 	}
 }
 
+// bounceAddress builds the SMTP MAIL FROM for an outbound job.
+// Remote MTAs send DSNs back to this address, allowing us to match them to the job.
+func bounceAddress(fromAddress string, jobID uuid.UUID) string {
+	if parts := strings.SplitN(fromAddress, "@", 2); len(parts) == 2 {
+		return fmt.Sprintf("bounces+%s@%s", jobID.String(), parts[1])
+	}
+	return fromAddress
+}
+
 func (q *Queue) deliver(ctx context.Context, job models.OutboundJob) {
-	err := q.mta.Send(job.FromAddress, job.Recipients, job.RawMessage)
+	mailFrom := bounceAddress(job.FromAddress, job.ID)
+	err := q.mta.Send(mailFrom, job.Recipients, job.RawMessage)
 	if err != nil {
 		nextAttempt := job.AttemptCount + 1
 		if nextAttempt >= job.MaxAttempts {

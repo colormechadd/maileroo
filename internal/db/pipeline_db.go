@@ -19,6 +19,7 @@ type PipelineDB interface {
 	CreateAttachment(ctx context.Context, attachment *models.EmailAttachment) error
 	CreateThread(ctx context.Context, thread *models.Thread) error
 	FindThreadIDByMessageIDs(ctx context.Context, mailboxID uuid.UUID, messageIDs []string) (uuid.UUID, error)
+	UpdateOutboundJobFailed(ctx context.Context, id uuid.UUID, lastError string) error
 }
 
 func (db *DB) CreateIngestion(ctx context.Context, ingestion *models.Ingestion) error {

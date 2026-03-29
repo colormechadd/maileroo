@@ -64,6 +64,7 @@ func NewPipeline(cfg *config.Config, db db.PipelineDB, storage storage.Storage, 
 		fn   Step
 	}{
 		{"deliver", Deliver},
+		{"parse_dsn", ParseDSN},
 		{"validate_sender", ValidateSender},
 		{"spam", ValidateRBL},
 		{"block", CheckBlockingRules},

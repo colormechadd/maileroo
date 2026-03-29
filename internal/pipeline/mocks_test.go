@@ -58,6 +58,11 @@ func (m *MockDB) FindThreadIDByMessageIDs(ctx context.Context, mailboxID uuid.UU
 	return args.Get(0).(uuid.UUID), args.Error(1)
 }
 
+func (m *MockDB) UpdateOutboundJobFailed(ctx context.Context, id uuid.UUID, lastError string) error {
+	args := m.Called(ctx, id, lastError)
+	return args.Error(0)
+}
+
 type MockHub struct {
 	mock.Mock
 }
