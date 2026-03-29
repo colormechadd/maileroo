@@ -48,7 +48,10 @@ type Session struct {
 }
 
 func (s *Session) AuthPlain(username, password string) error {
-	return nil
+	return &gosmtp.SMTPError{
+		Code:    503,
+		Message: "AUTH not supported on this server",
+	}
 }
 
 func (s *Session) Mail(from string, opts *gosmtp.MailOptions) error {
@@ -146,7 +149,7 @@ func StartServers(cfg config.SMTPConfig, mailDB db.MailDB, p *pipeline.Pipeline)
 		s.WriteTimeout = cfg.WriteTimeout
 		s.MaxMessageBytes = cfg.MaxMessageSize
 		s.MaxRecipients = cfg.MaxRecipients
-		s.AllowInsecureAuth = true
+		s.AllowInsecureAuth = false
 		s.TLSConfig = tlsConfig
 
 		servers = append(servers, s)

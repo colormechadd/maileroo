@@ -65,7 +65,7 @@ func LoadConfig() (*Config, error) {
 	viper.SetDefault("SPAM.RBL_SERVERS", []string{"zen.spamhaus.org"})
 
 	viper.SetDefault("WEB_PORT", 8080)
-	viper.SetDefault("SMTP.PORTS", []int{25, 587, 465, 2525})
+	viper.SetDefault("SMTP.PORTS", []int{25})
 	viper.SetDefault("SMTP.DOMAIN", "localhost")
 	viper.SetDefault("SMTP.READ_TIMEOUT", 10*time.Second)
 	viper.SetDefault("SMTP.WRITE_TIMEOUT", 10*time.Second)
@@ -134,7 +134,7 @@ func BindFlags(fs *pflag.FlagSet) {
 	fs.StringSlice("spam-rbl-servers", []string{"zen.spamhaus.org"}, "Spam RBL servers")
 	viper.BindPFlag("SPAM.RBL_SERVERS", fs.Lookup("spam-rbl-servers"))
 
-	fs.IntSlice("smtp-ports", []int{25, 587, 465, 2525}, "SMTP ports to listen on")
+	fs.IntSlice("smtp-ports", []int{25}, "SMTP ports to listen on")
 	viper.BindPFlag("SMTP.PORTS", fs.Lookup("smtp-ports"))
 
 	fs.String("smtp-domain", "localhost", "SMTP domain name")
