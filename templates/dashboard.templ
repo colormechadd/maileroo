@@ -1,6 +1,7 @@
 package templates
 
 import (
+	"fmt"
 	"github.com/colormechadd/maileroo/pkg/models"
 	"github.com/google/uuid"
 	"sort"
@@ -64,7 +65,24 @@ templ MailboxIcon(name string) {
 	}
 }
 
-templ Dashboard(user *models.User, mailboxes []models.Mailbox, currentMailboxID uuid.UUID, filter string, content templ.Component) {
+templ FilterLinkWithCount(mailboxID uuid.UUID, filterName string, label string, count int) {
+	<a
+		href={ templ.URL("/mailbox/" + mailboxID.String() + "?filter=" + filterName) }
+		hx-get={ "/mailbox/" + mailboxID.String() + "?filter=" + filterName }
+		hx-target="#main-content"
+		hx-push-url="true"
+		x-on:click={ "filter = '" + filterName + "'" }
+		class="flex items-center justify-between px-4 py-1.5 text-xs font-medium rounded-md transition-colors cursor-pointer"
+		x-bind:class={ "filter === '" + filterName + "' ? 'bg-purple-100 text-purple-900' : 'text-gray-500 hover:text-purple-600 hover:bg-purple-50/50'" }
+	>
+		<span>{ label }</span>
+		if count > 0 {
+			<span class="ml-1 inline-flex items-center justify-center px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-purple-600 text-white">{ fmt.Sprintf("%d", count) }</span>
+		}
+	</a>
+}
+
+templ Dashboard(user *models.User, mailboxes []models.Mailbox, currentMailboxID uuid.UUID, filter string, draftCount int, content templ.Component) {
 	@Layout("Dashboard") {
 		<div class="flex h-screen w-full overflow-hidden" 
 			 id="dashboard-root"
@@ -122,6 +140,11 @@ templ Dashboard(user *models.User, mailboxes []models.Mailbox, currentMailboxID 
 								@FilterLink(mb.ID, "starred", "Starred")
 								@FilterLink(mb.ID, "quarantined", "Quarantined")
 								@FilterLink(mb.ID, "deleted", "Trash")
+								if mb.ID == currentMailboxID {
+									@FilterLinkWithCount(mb.ID, "drafts", "Drafts", draftCount)
+								} else {
+									@FilterLink(mb.ID, "drafts", "Drafts")
+								}
 							</div>
 						</div>
 					}
@@ -229,6 +252,60 @@ templ MailboxContent(mailboxID uuid.UUID, filter string, emails []models.Email) 
 		} else {
 			<div class="flex flex-col items-center justify-center h-full text-gray-400 space-y-4">
 				<p class="font-medium underline decoration-purple-200 underline-offset-8">Select a mailbox from the left to view emails</p>
+			</div>
+		}
+	</div>
+}
+
+templ DraftsContent(mailboxID uuid.UUID, drafts []models.Draft) {
+	<header class="h-16 border-b border-purple-100 flex items-center justify-between px-8 bg-white/80 backdrop-blur-sm sticky top-0 z-10">
+		<h2 class="text-lg font-bold text-gray-900 uppercase tracking-tight">Drafts</h2>
+	</header>
+	<div class="flex-1 overflow-y-auto">
+		if len(drafts) > 0 {
+			<ul class="divide-y divide-purple-50">
+				for _, draft := range drafts {
+					<li
+						class="hover:bg-teal-50/30 transition-colors cursor-pointer group relative"
+						hx-get={ "/compose?draft=" + draft.ID.String() }
+						hx-target="#main-content"
+						hx-push-url="true"
+						hx-swap="innerHTML"
+					>
+						<div class="px-8 py-4 flex items-center">
+							<div class="flex-1 min-w-0">
+								<div class="flex items-center justify-between">
+									<p class="text-sm truncate font-bold text-gray-500 italic">
+										if draft.ToAddress != "" {
+											{ "To: " + draft.ToAddress }
+										} else {
+											No recipient
+										}
+									</p>
+									<p class="text-xs text-gray-400 group-hover:text-gray-500">
+										{ draft.UpdateDatetime.Format("Jan 02, 15:04") }
+									</p>
+								</div>
+								<div class="mt-1">
+									<p class="text-sm truncate text-gray-500">
+										if draft.Subject != "" {
+											{ draft.Subject }
+										} else {
+											(no subject)
+										}
+									</p>
+								</div>
+							</div>
+						</div>
+					</li>
+				}
+			</ul>
+		} else {
+			<div class="flex flex-col items-center justify-center h-full text-gray-400 space-y-4">
+				<svg class="h-16 w-16 opacity-20" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+					<path stroke-linecap="round" stroke-linejoin="round" stroke-width="1" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+				</svg>
+				<p class="font-medium">No drafts</p>
 			</div>
 		}
 	</div>

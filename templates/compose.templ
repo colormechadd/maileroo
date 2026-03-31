@@ -5,7 +5,7 @@ import (
 	"github.com/colormechadd/maileroo/pkg/models"
 )
 
-templ Compose(addresses []models.SendingAddress, fromID, to, cc, bcc, subject, inReplyTo, references, title, body, bodyHTML string) {
+templ Compose(addresses []models.SendingAddress, fromID, to, cc, bcc, subject, inReplyTo, references, draftID, title, body, bodyHTML string) {
 	{{
 		startIsHTML := bodyHTML != "" || body == ""
 	}}
@@ -42,8 +42,18 @@ templ Compose(addresses []models.SendingAddress, fromID, to, cc, bcc, subject, i
 
 		<div class="flex-1 overflow-y-auto p-8">
 			<div class="max-w-4xl mx-auto">
-				<form 
-					hx-post="/send" 
+				<!-- Auto-save draft trigger: fires on any change to the form after 2s inactivity -->
+				<div
+					hx-post="/draft"
+					hx-trigger="change from:#compose-form delay:2s"
+					hx-include="#compose-form"
+					hx-target="#draft-status"
+					hx-swap="innerHTML"
+				></div>
+
+				<form
+					id="compose-form"
+					hx-post="/send"
 					hx-target="#main-content"
 					hx-encoding="multipart/form-data"
 					@submit="sending = true"
@@ -136,6 +146,7 @@ templ Compose(addresses []models.SendingAddress, fromID, to, cc, bcc, subject, i
 
 						<input type="hidden" name="in_reply_to" value={ inReplyTo } />
 						<input type="hidden" name="references" value={ references } />
+						<input type="hidden" name="draft_id" id="draft-id-input" value={ draftID } />
 
 						<!-- Body -->
 						<div class="space-y-2">
@@ -216,18 +227,33 @@ templ Compose(addresses []models.SendingAddress, fromID, to, cc, bcc, subject, i
 					</div>
 
 					<div class="pt-4 flex items-center justify-between">
-						<div class="flex items-center text-gray-400 text-sm italic" x-show="sending" x-cloak>
-							<svg class="animate-spin -ml-1 mr-3 h-5 w-5 text-purple-500" fill="none" viewBox="0 0 24 24">
-								<circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-								<path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-							</svg>
-							Sending message...
+						<div class="flex items-center gap-4">
+							<div class="flex items-center text-gray-400 text-sm italic" x-show="sending" x-cloak>
+								<svg class="animate-spin -ml-1 mr-3 h-5 w-5 text-purple-500" fill="none" viewBox="0 0 24 24">
+									<circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+									<path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+								</svg>
+								Sending message...
+							</div>
+							<span id="draft-status" class="text-xs text-gray-400 italic" x-show="!sending">
+								if draftID != "" {
+									Draft saved
+								}
+							</span>
+							if draftID != "" {
+								<button
+									type="button"
+									hx-delete={ "/draft/" + draftID }
+									hx-confirm="Discard this draft?"
+									class="text-xs text-red-400 hover:text-red-600 transition-colors cursor-pointer"
+									x-show="!sending"
+								>Discard draft</button>
+							}
 						</div>
-						<div x-show="!sending" class="flex-1"></div>
-						
+
 						<div class="flex space-x-4">
-							<button 
-								type="submit" 
+							<button
+								type="submit"
 								x-bind:disabled="sending"
 								class="inline-flex items-center px-8 py-3 bg-teal-500 hover:bg-teal-600 disabled:bg-gray-300 text-white rounded-xl font-bold shadow-lg shadow-teal-100 transition-all cursor-pointer group"
 							>
