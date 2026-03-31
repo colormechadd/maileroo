@@ -114,6 +114,23 @@ type Email struct {
 	UserID           *uuid.UUID     `db:"user_id" json:"user_id,omitempty"`
 }
 
+type Draft struct {
+	ID               uuid.UUID  `db:"id" json:"id"`
+	MailboxID        uuid.UUID  `db:"mailbox_id" json:"mailbox_id"`
+	UserID           uuid.UUID  `db:"user_id" json:"user_id"`
+	SendingAddressID *uuid.UUID `db:"sending_address_id" json:"sending_address_id"`
+	ToAddress        string     `db:"to_address" json:"to_address"`
+	CcAddress        string     `db:"cc_address" json:"cc_address"`
+	BccAddress       string     `db:"bcc_address" json:"bcc_address"`
+	Subject          string     `db:"subject" json:"subject"`
+	Body             string     `db:"body" json:"body"`
+	BodyHTML         string     `db:"body_html" json:"body_html"`
+	InReplyTo        *string    `db:"in_reply_to" json:"in_reply_to"`
+	References       *string    `db:"references" json:"references"`
+	CreateDatetime   time.Time  `db:"create_datetime" json:"create_datetime"`
+	UpdateDatetime   time.Time  `db:"update_datetime" json:"update_datetime"`
+}
+
 type DKIMKey struct {
 	ID       uuid.UUID `db:"id" json:"id"`
 	Domain   string    `db:"domain" json:"domain"`

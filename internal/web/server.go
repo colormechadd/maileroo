@@ -82,6 +82,9 @@ func (s *Server) Routes() chi.Router {
 
 		r.Get("/compose", s.handleCompose)
 		r.Post("/send", s.handleEmailSend)
+
+		r.Post("/draft", s.handleDraftSave)
+		r.Delete("/draft/{draftID}", s.handleDraftDelete)
 	})
 
 	return r
@@ -106,6 +109,35 @@ func (s *Server) handleCompose(w http.ResponseWriter, r *http.Request) {
 	title := "New Message"
 	body := ""
 	bodyHTML := ""
+	draftID := ""
+
+	// Resume a saved draft
+	draftIDRaw := r.URL.Query().Get("draft")
+	if draftIDRaw != "" {
+		draftUUID, err := uuid.Parse(draftIDRaw)
+		if err == nil {
+			draft, err := s.db.GetDraftByIDForUser(r.Context(), draftUUID, user.ID)
+			if err == nil {
+				draftID = draft.ID.String()
+				title = "Draft"
+				to = draft.ToAddress
+				cc = draft.CcAddress
+				bcc = draft.BccAddress
+				subject = draft.Subject
+				body = draft.Body
+				bodyHTML = draft.BodyHTML
+				if draft.InReplyTo != nil {
+					inReplyTo = *draft.InReplyTo
+				}
+				if draft.References != nil {
+					references = *draft.References
+				}
+				if draft.SendingAddressID != nil {
+					fromID = draft.SendingAddressID.String()
+				}
+			}
+		}
+	}
 
 	replyToIDRaw := r.URL.Query().Get("replyTo")
 	if replyToIDRaw != "" {
@@ -187,7 +219,7 @@ func (s *Server) handleCompose(w http.ResponseWriter, r *http.Request) {
 	}
 
 	mailboxes, _ := s.db.GetMailboxesByUserID(r.Context(), user.ID)
-	s.render(w, r, user, mailboxes, uuid.Nil, "all", templates.Compose(addresses, fromID, to, cc, bcc, subject, inReplyTo, references, title, body, bodyHTML))
+	s.render(w, r, user, mailboxes, uuid.Nil, "all", 0, templates.Compose(addresses, fromID, to, cc, bcc, subject, inReplyTo, references, draftID, title, body, bodyHTML))
 }
 
 func (s *Server) validateUserAccessToEmailID(next http.Handler) http.Handler {
@@ -294,11 +326,125 @@ func (s *Server) handleEmailSend(w http.ResponseWriter, r *http.Request) {
 		slog.Error("failed to enqueue outbound job", "user_id", user.ID, "email_id", email.ID, "error", err)
 	}
 
+	if draftIDRaw := r.FormValue("draft_id"); draftIDRaw != "" {
+		if draftID, err := uuid.Parse(draftIDRaw); err == nil {
+			if err := s.db.DeleteDraft(r.Context(), draftID, user.ID); err != nil {
+				slog.Error("failed to delete draft after send", "draft_id", draftID, "error", err)
+			}
+		}
+	}
+
 	if r.Header.Get("HX-Request") == "true" {
 		w.Header().Set("HX-Location", "/mailbox/"+sa.MailboxID.String()+"?filter=sent")
 		return
 	}
 	http.Redirect(w, r, "/mailbox/"+sa.MailboxID.String()+"?filter=sent", http.StatusSeeOther)
+}
+
+func (s *Server) handleDraftSave(w http.ResponseWriter, r *http.Request) {
+	user := r.Context().Value("user").(*models.User)
+
+	if err := r.ParseForm(); err != nil {
+		http.Error(w, "Bad request", http.StatusBadRequest)
+		return
+	}
+
+	fromIDRaw := r.FormValue("from_id")
+	fromID, err := uuid.Parse(fromIDRaw)
+	if err != nil {
+		http.Error(w, "Invalid from_id", http.StatusBadRequest)
+		return
+	}
+
+	sa, err := s.db.GetSendingAddressByID(r.Context(), fromID, user.ID)
+	if err != nil {
+		http.Error(w, "Unauthorized from address", http.StatusForbidden)
+		return
+	}
+
+	var inReplyTo *string
+	var references *string
+	if v := r.FormValue("in_reply_to"); v != "" {
+		inReplyTo = &v
+	}
+	if v := r.FormValue("references"); v != "" {
+		references = &v
+	}
+
+	draftIDRaw := r.FormValue("draft_id")
+	if draftIDRaw != "" {
+		draftID, err := uuid.Parse(draftIDRaw)
+		if err == nil {
+			draft := models.Draft{
+				ID:               draftID,
+				UserID:           user.ID,
+				SendingAddressID: &sa.ID,
+				ToAddress:        r.FormValue("to"),
+				CcAddress:        r.FormValue("cc"),
+				BccAddress:       r.FormValue("bcc"),
+				Subject:          r.FormValue("subject"),
+				Body:             r.FormValue("body"),
+				BodyHTML:         r.FormValue("body_html"),
+				InReplyTo:        inReplyTo,
+				References:       references,
+			}
+			if err := s.db.UpdateDraft(r.Context(), draft); err != nil {
+				slog.Error("failed to update draft", "draft_id", draftID, "error", err)
+				http.Error(w, "Internal error", http.StatusInternalServerError)
+				return
+			}
+			fmt.Fprintf(w, `Saved<input type="hidden" id="draft-id-input" name="draft_id" value="%s" hx-swap-oob="true">`, draftID)
+			return
+		}
+	}
+
+	draft := models.Draft{
+		MailboxID:        sa.MailboxID,
+		UserID:           user.ID,
+		SendingAddressID: &sa.ID,
+		ToAddress:        r.FormValue("to"),
+		CcAddress:        r.FormValue("cc"),
+		BccAddress:       r.FormValue("bcc"),
+		Subject:          r.FormValue("subject"),
+		Body:             r.FormValue("body"),
+		BodyHTML:         r.FormValue("body_html"),
+		InReplyTo:        inReplyTo,
+		References:       references,
+	}
+	created, err := s.db.CreateDraft(r.Context(), draft)
+	if err != nil {
+		slog.Error("failed to create draft", "user_id", user.ID, "error", err)
+		http.Error(w, "Internal error", http.StatusInternalServerError)
+		return
+	}
+	fmt.Fprintf(w, `Saved<input type="hidden" id="draft-id-input" name="draft_id" value="%s" hx-swap-oob="true">`, created.ID)
+}
+
+func (s *Server) handleDraftDelete(w http.ResponseWriter, r *http.Request) {
+	user := r.Context().Value("user").(*models.User)
+	draftID, err := uuid.Parse(chi.URLParam(r, "draftID"))
+	if err != nil {
+		http.Error(w, "Invalid ID", http.StatusBadRequest)
+		return
+	}
+
+	draft, err := s.db.GetDraftByIDForUser(r.Context(), draftID, user.ID)
+	if err != nil {
+		http.Error(w, "Not found", http.StatusNotFound)
+		return
+	}
+
+	if err := s.db.DeleteDraft(r.Context(), draftID, user.ID); err != nil {
+		slog.Error("failed to delete draft", "draft_id", draftID, "error", err)
+		http.Error(w, "Internal error", http.StatusInternalServerError)
+		return
+	}
+
+	if r.Header.Get("HX-Request") == "true" {
+		w.Header().Set("HX-Redirect", "/mailbox/"+draft.MailboxID.String()+"?filter=drafts")
+		return
+	}
+	http.Redirect(w, r, "/mailbox/"+draft.MailboxID.String()+"?filter=drafts", http.StatusSeeOther)
 }
 
 func (s *Server) handleEvents(w http.ResponseWriter, r *http.Request) {
@@ -339,12 +485,20 @@ func (s *Server) handleEvents(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (s *Server) render(w http.ResponseWriter, r *http.Request, user *models.User, mailboxes []models.Mailbox, currentMailboxID uuid.UUID, filter string, content templ.Component) {
+func (s *Server) render(w http.ResponseWriter, r *http.Request, user *models.User, mailboxes []models.Mailbox, currentMailboxID uuid.UUID, filter string, draftCount int, content templ.Component) {
 	if r.Header.Get("HX-Request") == "true" {
 		content.Render(r.Context(), w)
 		return
 	}
-	templates.Dashboard(user, mailboxes, currentMailboxID, filter, content).Render(r.Context(), w)
+	templates.Dashboard(user, mailboxes, currentMailboxID, filter, draftCount, content).Render(r.Context(), w)
+}
+
+func (s *Server) draftCount(ctx context.Context, mailboxID uuid.UUID, userID uuid.UUID) int {
+	if mailboxID == uuid.Nil {
+		return 0
+	}
+	count, _ := s.db.CountDraftsByMailboxID(ctx, mailboxID, userID)
+	return count
 }
 
 func (s *Server) handleDashboard(w http.ResponseWriter, r *http.Request) {
@@ -368,7 +522,7 @@ func (s *Server) handleDashboard(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	s.render(w, r, user, mailboxes, uuid.Nil, "all", templates.MailboxContent(uuid.Nil, "all", nil))
+	s.render(w, r, user, mailboxes, uuid.Nil, "all", 0, templates.MailboxContent(uuid.Nil, "all", nil))
 }
 
 func (s *Server) handleMailboxView(w http.ResponseWriter, r *http.Request) {
@@ -403,6 +557,19 @@ func (s *Server) handleMailboxView(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	dc := s.draftCount(r.Context(), mailboxID, user.ID)
+
+	if filter == "drafts" {
+		drafts, err := s.db.GetDraftsByMailboxID(r.Context(), mailboxID, user.ID)
+		if err != nil {
+			slog.Error("failed to fetch drafts", "mailbox_id", mailboxID, "error", err)
+			http.Error(w, "Internal error", http.StatusInternalServerError)
+			return
+		}
+		s.render(w, r, user, mailboxes, mailboxID, filter, dc, templates.DraftsContent(mailboxID, drafts))
+		return
+	}
+
 	emails, err := s.db.GetEmailsByMailboxID(r.Context(), mailboxID, filter, 50, 0)
 	if err != nil {
 		slog.Error("failed to fetch emails", "mailbox_id", mailboxID, "filter", filter, "error", err)
@@ -410,7 +577,7 @@ func (s *Server) handleMailboxView(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	s.render(w, r, user, mailboxes, mailboxID, filter, templates.MailboxContent(mailboxID, filter, emails))
+	s.render(w, r, user, mailboxes, mailboxID, filter, dc, templates.MailboxContent(mailboxID, filter, emails))
 }
 
 func (s *Server) handleEmailView(w http.ResponseWriter, r *http.Request) {
@@ -453,7 +620,7 @@ func (s *Server) handleEmailView(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	s.render(w, r, user, mailboxes, email.MailboxID, "all", templates.EmailDetail(email, attachments, content, isHTML))
+	s.render(w, r, user, mailboxes, email.MailboxID, "all", 0, templates.EmailDetail(email, attachments, content, isHTML))
 }
 
 func (s *Server) handleEmailStar(w http.ResponseWriter, r *http.Request) {
@@ -578,7 +745,7 @@ func (s *Server) handleEmailHeaders(w http.ResponseWriter, r *http.Request) {
 		slog.Error("failed to fetch mailboxes", "user_id", user.ID, "error", err)
 	}
 
-	s.render(w, r, user, mailboxes, email.MailboxID, "all", templates.EmailHeaders(email, headers))
+	s.render(w, r, user, mailboxes, email.MailboxID, "all", 0, templates.EmailHeaders(email, headers))
 }
 
 func (s *Server) handleEmailPipeline(w http.ResponseWriter, r *http.Request) {
@@ -615,7 +782,7 @@ func (s *Server) handleEmailPipeline(w http.ResponseWriter, r *http.Request) {
 		slog.Error("failed to fetch mailboxes", "user_id", user.ID, "error", err)
 	}
 
-	s.render(w, r, user, mailboxes, email.MailboxID, "all", templates.EmailPipeline(email, steps))
+	s.render(w, r, user, mailboxes, email.MailboxID, "all", 0, templates.EmailPipeline(email, steps))
 }
 
 func (s *Server) AuthMiddleware(next http.Handler) http.Handler {

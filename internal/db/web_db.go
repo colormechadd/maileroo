@@ -32,6 +32,13 @@ type WebDB interface {
 	GetSendingAddressByID(ctx context.Context, id, userID uuid.UUID) (*models.SendingAddress, error)
 
 	InsertOutboundJob(ctx context.Context, emailID *uuid.UUID, fromAddress string, recipients []string, rawMessage []byte) (*models.OutboundJob, error)
+
+	CreateDraft(ctx context.Context, draft models.Draft) (*models.Draft, error)
+	UpdateDraft(ctx context.Context, draft models.Draft) error
+	GetDraftByIDForUser(ctx context.Context, draftID, userID uuid.UUID) (*models.Draft, error)
+	DeleteDraft(ctx context.Context, draftID, userID uuid.UUID) error
+	GetDraftsByMailboxID(ctx context.Context, mailboxID, userID uuid.UUID) ([]models.Draft, error)
+	CountDraftsByMailboxID(ctx context.Context, mailboxID, userID uuid.UUID) (int, error)
 }
 
 func (db *DB) CreateWebmailSession(ctx context.Context, userID uuid.UUID, token string, remoteIP, userAgent string, expires time.Time) error {

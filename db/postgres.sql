@@ -85,6 +85,28 @@ CREATE TABLE public.dkim_key (
 
 
 --
+-- Name: draft; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.draft (
+    id uuid DEFAULT uuidv7() NOT NULL,
+    mailbox_id uuid NOT NULL,
+    user_id uuid NOT NULL,
+    sending_address_id uuid,
+    to_address text DEFAULT ''::text NOT NULL,
+    cc_address text DEFAULT ''::text NOT NULL,
+    bcc_address text DEFAULT ''::text NOT NULL,
+    subject text DEFAULT ''::text NOT NULL,
+    body text DEFAULT ''::text NOT NULL,
+    body_html text DEFAULT ''::text NOT NULL,
+    in_reply_to text,
+    "references" text,
+    create_datetime timestamp with time zone DEFAULT now(),
+    update_datetime timestamp with time zone DEFAULT now()
+);
+
+
+--
 -- Name: email; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -311,6 +333,14 @@ ALTER TABLE ONLY public.dkim_key
 
 ALTER TABLE ONLY public.dkim_key
     ADD CONSTRAINT dkim_key_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: draft draft_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.draft
+    ADD CONSTRAINT draft_pkey PRIMARY KEY (id);
 
 
 --
@@ -604,6 +634,30 @@ ALTER TABLE ONLY public.address_mapping
 
 
 --
+-- Name: draft draft_mailbox_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.draft
+    ADD CONSTRAINT draft_mailbox_id_fkey FOREIGN KEY (mailbox_id) REFERENCES public.mailbox(id) ON DELETE CASCADE;
+
+
+--
+-- Name: draft draft_sending_address_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.draft
+    ADD CONSTRAINT draft_sending_address_id_fkey FOREIGN KEY (sending_address_id) REFERENCES public.sending_address(id) ON DELETE SET NULL;
+
+
+--
+-- Name: draft draft_user_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.draft
+    ADD CONSTRAINT draft_user_id_fkey FOREIGN KEY (user_id) REFERENCES public."user"(id) ON DELETE CASCADE;
+
+
+--
 -- Name: email email_address_mapping_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -746,4 +800,5 @@ INSERT INTO public.schema_migrations (version) VALUES
     ('20260228000000'),
     ('20260329000000'),
     ('20260329000001'),
-    ('20260330000000');
+    ('20260330000000'),
+    ('20260330000001');
