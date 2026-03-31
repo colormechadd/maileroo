@@ -92,7 +92,7 @@ func LoadConfig() (*Config, error) {
 	viper.SetDefault("RATE_LIMIT.SMTP_AUTO_BLOCK_DURATION", time.Hour)
 	viper.SetDefault("RATE_LIMIT.OUTBOUND_PER_USER_HOUR", 100)
 	viper.SetDefault("RATE_LIMIT.GREYLIST_ENABLED", false)
-	viper.SetDefault("RATE_LIMIT.GREYLIST_DELAY", 5*time.Minute)
+	viper.SetDefault("RATE_LIMIT.GREYLIST_DELAY", 1*time.Minute)
 
 	viper.SetDefault("DKIM.ENCRYPTION_KEY", "")
 
@@ -215,4 +215,3 @@ func BindFlags(fs *pflag.FlagSet) {
 	fs.String("gcs-storage-prefix", "", "GCS storage prefix")
 	viper.BindPFlag("GCS_STORAGE.PREFIX", fs.Lookup("gcs-storage-prefix"))
 }
-
