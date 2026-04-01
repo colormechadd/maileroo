@@ -151,7 +151,12 @@ templ Dashboard(user *models.User, mailboxes []models.Mailbox, currentMailboxID 
 					}
 				</nav>
 				<div class="p-4 border-t border-purple-100">
-					<div class="flex items-center px-4">
+					<div 
+						class="flex items-center px-4 cursor-pointer hover:bg-purple-50 rounded-lg py-2 transition-colors"
+						hx-get="/user-info"
+						hx-target="#main-content"
+						hx-push-url="true"
+					>
 						<div class="flex-shrink-0">
 							<div class="h-8 w-8 rounded-full bg-teal-500 flex items-center justify-center text-white font-bold text-xs uppercase shadow-sm">
 								{ user.Username[:1] }

@@ -31,6 +31,7 @@ type WebDB interface {
 	GetActiveSendingAddresses(ctx context.Context, userID uuid.UUID) ([]models.SendingAddress, error)
 	IsAuthorizedSendingAddress(ctx context.Context, userID uuid.UUID, address string) (bool, error)
 	GetSendingAddressByID(ctx context.Context, id, userID uuid.UUID) (*models.SendingAddress, error)
+	UpdateSendingAddressDisplayName(ctx context.Context, id, userID uuid.UUID, displayName string) error
 
 	InsertOutboundJob(ctx context.Context, emailID *uuid.UUID, fromAddress string, recipients []string, rawMessage []byte) (*models.OutboundJob, error)
 
@@ -216,7 +217,7 @@ func (db *DB) UpdateEmailStatus(ctx context.Context, emailID, userID uuid.UUID, 
 
 func (db *DB) GetActiveSendingAddresses(ctx context.Context, userID uuid.UUID) ([]models.SendingAddress, error) {
 	var addresses []models.SendingAddress
-	err := db.SelectContext(ctx, &addresses, "SELECT id, user_id, mailbox_id, address, is_active FROM sending_address WHERE user_id = $1 AND is_active = TRUE ORDER BY address ASC", userID)
+	err := db.SelectContext(ctx, &addresses, "SELECT id, user_id, mailbox_id, address, display_name, is_active FROM sending_address WHERE user_id = $1 AND is_active = TRUE ORDER BY address ASC", userID)
 	return addresses, err
 }
 
@@ -228,8 +229,13 @@ func (db *DB) IsAuthorizedSendingAddress(ctx context.Context, userID uuid.UUID, 
 
 func (db *DB) GetSendingAddressByID(ctx context.Context, id, userID uuid.UUID) (*models.SendingAddress, error) {
 	var sa models.SendingAddress
-	err := db.GetContext(ctx, &sa, "SELECT id, user_id, mailbox_id, address, is_active FROM sending_address WHERE id = $1 AND user_id = $2 AND is_active = TRUE", id, userID)
+	err := db.GetContext(ctx, &sa, "SELECT id, user_id, mailbox_id, address, display_name, is_active FROM sending_address WHERE id = $1 AND user_id = $2 AND is_active = TRUE", id, userID)
 	return &sa, err
+}
+
+func (db *DB) UpdateSendingAddressDisplayName(ctx context.Context, id, userID uuid.UUID, displayName string) error {
+	_, err := db.ExecContext(ctx, "UPDATE sending_address SET display_name = $1 WHERE id = $2 AND user_id = $3", displayName, id, userID)
+	return err
 }
 
 func (db *DB) SearchEmailsByMailboxID(ctx context.Context, mailboxID, userID uuid.UUID, query string, limit, offset int) ([]models.Email, error) {

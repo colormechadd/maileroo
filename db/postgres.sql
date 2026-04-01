@@ -296,7 +296,8 @@ CREATE TABLE public.sending_address (
     mailbox_id uuid NOT NULL,
     address text NOT NULL,
     is_active boolean DEFAULT true,
-    create_datetime timestamp with time zone DEFAULT CURRENT_TIMESTAMP
+    create_datetime timestamp with time zone DEFAULT CURRENT_TIMESTAMP,
+    display_name text
 );
 
 
@@ -886,4 +887,5 @@ INSERT INTO public.schema_migrations (version) VALUES
     ('20260330000000'),
     ('20260330000001'),
     ('20260330000002'),
-    ('20260331000000');
+    ('20260331000000'),
+    ('20260331000001');

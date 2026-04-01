@@ -31,6 +31,7 @@ type SendingAddress struct {
 	UserID         uuid.UUID `db:"user_id" json:"user_id"`
 	MailboxID      uuid.UUID `db:"mailbox_id" json:"mailbox_id"`
 	Address        string    `db:"address" json:"address"`
+	DisplayName    *string   `db:"display_name" json:"display_name"`
 	IsActive       bool      `db:"is_active" json:"is_active"`
 }
 

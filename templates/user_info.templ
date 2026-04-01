@@ -1,0 +1,97 @@
+package templates
+
+import (
+	"github.com/colormechadd/maileroo/pkg/models"
+)
+
+templ UserInfo(user *models.User, mailboxes []models.Mailbox, sendingAddresses []models.SendingAddress) {
+	<div class="flex-1 flex flex-col min-h-0 bg-gray-50">
+		<!-- Header -->
+		<div class="bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between">
+			<div class="flex items-center">
+				<div class="h-10 w-10 rounded-full bg-teal-500 flex items-center justify-center text-white font-bold text-lg uppercase shadow-sm">
+					{ user.Username[:1] }
+				</div>
+				<div class="ml-4">
+					<h1 class="text-xl font-bold text-gray-900">{ user.Username }</h1>
+					<p class="text-sm text-gray-500">User Settings</p>
+				</div>
+			</div>
+			<button class="text-gray-400 hover:text-gray-600 transition-colors cursor-pointer p-2 hover:bg-gray-100 rounded-full" hx-get="/mailbox" hx-target="#main-content" hx-push-url="true" title="Close">
+				<svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+					<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+				</svg>
+			</button>
+		</div>
+
+		<!-- Content -->
+		<div class="flex-1 overflow-y-auto p-6">
+			<div class="max-w-4xl mx-auto space-y-8">
+				<!-- Mailboxes -->
+				<section>
+					<h2 class="text-lg font-semibold text-gray-900 mb-4 flex items-center">
+						<svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2 text-purple-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+							<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+						</svg>
+						Mailboxes
+					</h2>
+					<div class="bg-white shadow rounded-lg divide-y divide-gray-200">
+						for _, mb := range mailboxes {
+							<div class="p-4">
+								<h3 class="font-medium text-gray-900">{ mb.Name }</h3>
+								<div class="mt-4 space-y-4">
+									<h4 class="text-xs font-semibold text-gray-500 uppercase tracking-wider">Sending Addresses</h4>
+									<div class="grid grid-cols-1 gap-4">
+										for _, sa := range sendingAddresses {
+											if sa.MailboxID == mb.ID {
+												<div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg border border-gray-100 group">
+													<div class="flex-1">
+														<div class="flex items-center">
+															<span class="text-sm font-medium text-gray-900">{ sa.Address }</span>
+														</div>
+														<div class="mt-1">
+															<form 
+																hx-post={ "/user/sending-address/" + sa.ID.String() + "/display-name" } 
+																hx-swap="none" 
+																class="flex items-center"
+																x-data="{ saved: false }"
+																@htmx:after-request.camel="if ($event.detail.successful) { saved = true; setTimeout(() => saved = false, 2000) }"
+															>
+																<input 
+																	type="text" 
+																	name="display_name" 
+																	placeholder="Display Name (e.g. Chad Haynes)" 
+																	value={ getDisplayName(sa.DisplayName) }
+																	class="text-xs border-b border-transparent hover:border-gray-300 focus:border-purple-500 focus:outline-none bg-transparent py-1 w-full transition-colors"
+																/>
+																<button 
+																	type="submit" 
+																	class="ml-2 text-xs font-medium transition-all cursor-pointer whitespace-nowrap"
+																	:class="saved ? 'text-green-600' : 'text-purple-600 hover:text-purple-800 opacity-0 group-hover:opacity-100'"
+																>
+																	<span x-show="!saved">Save</span>
+																	<span x-show="saved" x-cloak>Saved!</span>
+																</button>
+															</form>
+														</div>
+													</div>
+												</div>
+											}
+										}
+									</div>
+								</div>
+							</div>
+						}
+					</div>
+				</section>
+			</div>
+		</div>
+	</div>
+}
+
+func getDisplayName(dn *string) string {
+	if dn == nil {
+		return ""
+	}
+	return *dn
+}

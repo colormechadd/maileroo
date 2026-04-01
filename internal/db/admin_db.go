@@ -118,13 +118,13 @@ func (db *DB) AddUserToMailbox(ctx context.Context, mailboxID, userID uuid.UUID)
 }
 
 func (db *DB) AddSendingAddress(ctx context.Context, sa *models.SendingAddress) error {
-	_, err := db.ExecContext(ctx, "INSERT INTO sending_address (id, user_id, mailbox_id, address, is_active) VALUES ($1, $2, $3, $4, $5)", sa.ID, sa.UserID, sa.MailboxID, sa.Address, sa.IsActive)
+	_, err := db.ExecContext(ctx, "INSERT INTO sending_address (id, user_id, mailbox_id, address, display_name, is_active) VALUES ($1, $2, $3, $4, $5, $6)", sa.ID, sa.UserID, sa.MailboxID, sa.Address, sa.DisplayName, sa.IsActive)
 	return err
 }
 
 func (db *DB) ListSendingAddresses(ctx context.Context, userID uuid.UUID) ([]models.SendingAddress, error) {
 	var addresses []models.SendingAddress
-	err := db.SelectContext(ctx, &addresses, "SELECT id, user_id, mailbox_id, address, is_active FROM sending_address WHERE user_id = $1 ORDER BY address ASC", userID)
+	err := db.SelectContext(ctx, &addresses, "SELECT id, user_id, mailbox_id, address, display_name, is_active FROM sending_address WHERE user_id = $1 ORDER BY address ASC", userID)
 	return addresses, err
 }
 

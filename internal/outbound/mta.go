@@ -22,16 +22,17 @@ type Attachment struct {
 }
 
 type Message struct {
-	From        string
-	To          []string
-	Cc          []string
-	Bcc         []string
-	Subject     string
-	TextBody    string
-	HTMLBody    string
-	InReplyTo   string
-	References  string
-	Attachments []Attachment
+	From            string
+	FromDisplayName string
+	To              []string
+	Cc              []string
+	Bcc             []string
+	Subject         string
+	TextBody        string
+	HTMLBody        string
+	InReplyTo       string
+	References      string
+	Attachments     []Attachment
 }
 
 type Sender interface {
@@ -62,7 +63,7 @@ func NewMTA(hostname string, relay string, dkim *DKIMSigner) *MTA {
 func (m *MTA) BuildMessage(msg Message) (rawBytes []byte, from string, recipients []string, err error) {
 	var buf bytes.Buffer
 	var h mail.Header
-	h.SetAddressList("From", []*mail.Address{{Address: msg.From}})
+	h.SetAddressList("From", []*mail.Address{{Name: msg.FromDisplayName, Address: msg.From}})
 
 	toAddrs := make([]*mail.Address, len(msg.To))
 	for i, a := range msg.To {

@@ -86,6 +86,9 @@ func (s *Server) Routes() chi.Router {
 		r.Get("/compose", s.handleCompose)
 		r.Post("/send", s.handleEmailSend)
 
+		r.Get("/user-info", s.handleUserInfo)
+		r.Post("/user/sending-address/{saID}/display-name", s.handleUpdateDisplayName)
+
 		r.Post("/draft", s.handleDraftSave)
 		r.Delete("/draft/{draftID}", s.handleDraftDelete)
 	})
@@ -277,16 +280,22 @@ func (s *Server) handleEmailSend(w http.ResponseWriter, r *http.Request) {
 	cc := parseAddresses(ccRaw)
 	bcc := parseAddresses(bccRaw)
 
+	fromDisplayName := ""
+	if sa.DisplayName != nil {
+		fromDisplayName = *sa.DisplayName
+	}
+
 	outMsg := outbound.Message{
-		From:       sa.Address,
-		To:         to,
-		Cc:         cc,
-		Bcc:        bcc,
-		Subject:    subject,
-		TextBody:   body,
-		HTMLBody:   bodyHTML,
-		InReplyTo:  inReplyTo,
-		References: references,
+		From:            sa.Address,
+		FromDisplayName: fromDisplayName,
+		To:              to,
+		Cc:              cc,
+		Bcc:             bcc,
+		Subject:         subject,
+		TextBody:        body,
+		HTMLBody:        bodyHTML,
+		InReplyTo:       inReplyTo,
+		References:      references,
 	}
 
 	files := r.MultipartForm.File["attachments"]
@@ -973,6 +982,48 @@ func (s *Server) handleAttachmentDownload(w http.ResponseWriter, r *http.Request
 	w.Header().Set("Content-Type", att.ContentType)
 	w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=\"%s\"", att.Filename))
 	io.Copy(w, bodyReader)
+}
+
+func (s *Server) handleUserInfo(w http.ResponseWriter, r *http.Request) {
+	user := r.Context().Value("user").(*models.User)
+
+	mailboxes, err := s.db.GetMailboxesByUserID(r.Context(), user.ID)
+	if err != nil {
+		slog.Error("failed to fetch mailboxes", "user_id", user.ID, "error", err)
+		http.Error(w, "Internal error", http.StatusInternalServerError)
+		return
+	}
+
+	sendingAddresses, err := s.db.GetActiveSendingAddresses(r.Context(), user.ID)
+	if err != nil {
+		slog.Error("failed to fetch sending addresses", "user_id", user.ID, "error", err)
+		http.Error(w, "Internal error", http.StatusInternalServerError)
+		return
+	}
+
+	component := templates.UserInfo(user, mailboxes, sendingAddresses)
+	component.Render(r.Context(), w)
+}
+
+func (s *Server) handleUpdateDisplayName(w http.ResponseWriter, r *http.Request) {
+	user := r.Context().Value("user").(*models.User)
+	saIDRaw := chi.URLParam(r, "saID")
+	saID, err := uuid.Parse(saIDRaw)
+	if err != nil {
+		http.Error(w, "Invalid ID", http.StatusBadRequest)
+		return
+	}
+
+	displayName := r.FormValue("display_name")
+
+	err = s.db.UpdateSendingAddressDisplayName(r.Context(), saID, user.ID, displayName)
+	if err != nil {
+		slog.Error("failed to update display name", "user_id", user.ID, "sa_id", saID, "error", err)
+		http.Error(w, "Internal error", http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
 }
 
 func generateToken() string {
