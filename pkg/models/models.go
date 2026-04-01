@@ -112,6 +112,7 @@ type Email struct {
 	Status           EmailStatus    `db:"status" json:"status"`
 	SendingAddressID *uuid.UUID     `db:"sending_address_id" json:"sending_address_id"`
 	UserID           *uuid.UUID     `db:"user_id" json:"user_id,omitempty"`
+	BodyPlain        *string        `db:"body_plain" json:"-"`
 }
 
 type Draft struct {

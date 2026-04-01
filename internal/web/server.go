@@ -70,6 +70,7 @@ func (s *Server) Routes() chi.Router {
 		r.Get("/", s.handleDashboard)
 		r.Get("/events", s.handleEvents)
 		r.Get("/mailbox/{mailboxID}", s.handleMailboxView)
+		r.Get("/mailbox/{mailboxID}/search", s.handleMailboxSearch)
 		r.Group(func(r chi.Router) {
 			r.Use(s.validateUserAccessToEmailID)
 
@@ -590,6 +591,50 @@ func (s *Server) handleMailboxView(w http.ResponseWriter, r *http.Request) {
 	}
 
 	s.render(w, r, user, mailboxes, mailboxID, filter, dc, templates.MailboxContent(mailboxID, filter, emails))
+}
+
+func (s *Server) handleMailboxSearch(w http.ResponseWriter, r *http.Request) {
+	user := r.Context().Value("user").(*models.User)
+	mailboxID, err := uuid.Parse(chi.URLParam(r, "mailboxID"))
+	if err != nil {
+		http.Error(w, "Invalid ID", http.StatusBadRequest)
+		return
+	}
+
+	mailboxes, err := s.db.GetMailboxesByUserID(r.Context(), user.ID)
+	if err != nil {
+		slog.Error("failed to fetch mailboxes", "user_id", user.ID, "error", err)
+		http.Error(w, "Internal error", http.StatusInternalServerError)
+		return
+	}
+
+	owned := false
+	for _, mb := range mailboxes {
+		if mb.ID == mailboxID {
+			owned = true
+			break
+		}
+	}
+	if !owned {
+		http.Error(w, "Forbidden", http.StatusForbidden)
+		return
+	}
+
+	query := strings.TrimSpace(r.URL.Query().Get("q"))
+	if query == "" {
+		http.Redirect(w, r, "/mailbox/"+mailboxID.String(), http.StatusSeeOther)
+		return
+	}
+
+	emails, err := s.db.SearchEmailsByMailboxID(r.Context(), mailboxID, user.ID, query, 50, 0)
+	if err != nil {
+		slog.Error("search failed", "mailbox_id", mailboxID, "query", query, "error", err)
+		http.Error(w, "Internal error", http.StatusInternalServerError)
+		return
+	}
+
+	dc := s.draftCount(r.Context(), mailboxID, user.ID)
+	s.render(w, r, user, mailboxes, mailboxID, "search", dc, templates.SearchContent(mailboxID, query, emails))
 }
 
 func (s *Server) handleEmailView(w http.ResponseWriter, r *http.Request) {

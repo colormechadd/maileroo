@@ -21,3 +21,17 @@ Maileroo is an all-in-one email platform built with Go, focusing on simplicity, 
 - `migrations/`: SQL migrations.
 - `templates/`: Templ source files.
 - `static/`: Frontend assets.
+
+## Database
+
+The database schema is defined in db/postgres.sql
+
+### Naming Conventions
+
+* Table names are singular
+* Timestamp fields should be present tense and use _datetime as suffix
+* Use UUIDv7 for primary keys
+
+## Web
+
+Use htmx, tailwind and alpinejs

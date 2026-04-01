@@ -17,6 +17,7 @@ type WebDB interface {
 	GetUserByID(ctx context.Context, id uuid.UUID) (*models.User, error)
 	GetMailboxesByUserID(ctx context.Context, userID uuid.UUID) ([]models.Mailbox, error)
 	GetEmailsByMailboxID(ctx context.Context, mailboxID uuid.UUID, filter string, limit, offset int) ([]models.Email, error)
+	SearchEmailsByMailboxID(ctx context.Context, mailboxID, userID uuid.UUID, query string, limit, offset int) ([]models.Email, error)
 	GetEmailByID(ctx context.Context, emailID uuid.UUID) (*models.Email, error)
 	GetEmailByIDForUser(ctx context.Context, emailID, userID uuid.UUID) (*models.Email, error)
 	GetAttachmentsByEmailID(ctx context.Context, emailID uuid.UUID) ([]models.EmailAttachment, error)
@@ -229,4 +230,25 @@ func (db *DB) GetSendingAddressByID(ctx context.Context, id, userID uuid.UUID) (
 	var sa models.SendingAddress
 	err := db.GetContext(ctx, &sa, "SELECT id, user_id, mailbox_id, address, is_active FROM sending_address WHERE id = $1 AND user_id = $2 AND is_active = TRUE", id, userID)
 	return &sa, err
+}
+
+func (db *DB) SearchEmailsByMailboxID(ctx context.Context, mailboxID, userID uuid.UUID, query string, limit, offset int) ([]models.Email, error) {
+	var emails []models.Email
+	err := db.SelectContext(ctx, &emails, `
+		SELECT
+			e.id, e.mailbox_id, e.thread_id, e.address_mapping_id, e.ingestion_id, e.message_id,
+			e.in_reply_to, e."references", e.subject, e.from_address, e.to_address,
+			e.reply_to_address, e.storage_key, e.size, e.receive_datetime, e.is_read, e.is_star,
+			e.direction, e.status, e.sending_address_id, e.user_id
+		FROM email e
+		JOIN mailbox_user mu ON e.mailbox_id = mu.mailbox_id
+		WHERE e.mailbox_id = $1
+		  AND mu.user_id = $2
+		  AND mu.is_active = TRUE
+		  AND e.status != 'DELETED'
+		  AND e.search_vector @@ plainto_tsquery('english', $3)
+		ORDER BY ts_rank(e.search_vector, plainto_tsquery('english', $3)) DESC, e.receive_datetime DESC
+		LIMIT $4 OFFSET $5
+	`, mailboxID, userID, query, limit, offset)
+	return emails, err
 }

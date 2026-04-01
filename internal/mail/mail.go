@@ -167,6 +167,11 @@ func (s *Service) Persist(ctx context.Context, opts PersistOptions) (*models.Ema
 		email.References = &opts.References
 	}
 
+	bodyPlain := extractBodyPlain(opts.RawMessage)
+	if bodyPlain != "" {
+		email.BodyPlain = &bodyPlain
+	}
+
 	if err := s.repo.CreateEmail(ctx, email); err != nil {
 		return nil, fmt.Errorf("email creation failed: %w", err)
 	}
@@ -378,6 +383,36 @@ func (s *Service) CompressData(data []byte, algorithm string) ([]byte, string, e
 	default:
 		return data, "", nil
 	}
+}
+
+func extractBodyPlain(rawMessage []byte) string {
+	mr, err := gomail.CreateReader(bytes.NewReader(rawMessage))
+	if err != nil {
+		return ""
+	}
+	defer mr.Close()
+
+	var plain string
+	for {
+		p, err := mr.NextPart()
+		if err != nil {
+			break
+		}
+		h, ok := p.Header.(*gomail.InlineHeader)
+		if !ok {
+			continue
+		}
+		ct, _, _ := h.ContentType()
+		if ct == "text/plain" {
+			b, _ := io.ReadAll(p.Body)
+			return string(b)
+		}
+		if ct == "text/html" && plain == "" {
+			b, _ := io.ReadAll(p.Body)
+			plain = bluemonday.StripTagsPolicy().Sanitize(string(b))
+		}
+	}
+	return plain
 }
 
 func (s *Service) ParseReferences(raw string) []string {

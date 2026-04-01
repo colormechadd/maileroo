@@ -135,7 +135,9 @@ CREATE TABLE public.email (
     status public.email_status DEFAULT 'INBOX'::public.email_status NOT NULL,
     create_datetime timestamp with time zone DEFAULT CURRENT_TIMESTAMP,
     update_datetime timestamp with time zone DEFAULT CURRENT_TIMESTAMP,
-    user_id uuid
+    user_id uuid,
+    body_plain text,
+    search_vector tsvector GENERATED ALWAYS AS (to_tsvector('english'::regconfig, ((((((COALESCE(subject, ''::text) || ' '::text) || COALESCE(from_address, ''::text)) || ' '::text) || COALESCE(to_address, ''::text)) || ' '::text) || COALESCE(body_plain, ''::text)))) STORED
 );
 
 
@@ -588,6 +590,13 @@ CREATE INDEX idx_email_receive_datetime ON public.email USING btree (receive_dat
 
 
 --
+-- Name: idx_email_search_vector; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_email_search_vector ON public.email USING gin (search_vector);
+
+
+--
 -- Name: idx_email_sending_address_id; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -876,4 +885,5 @@ INSERT INTO public.schema_migrations (version) VALUES
     ('20260329000001'),
     ('20260330000000'),
     ('20260330000001'),
-    ('20260330000002');
+    ('20260330000002'),
+    ('20260331000000');
