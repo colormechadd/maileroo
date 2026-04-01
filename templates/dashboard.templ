@@ -138,6 +138,7 @@ templ Dashboard(user *models.User, mailboxes []models.Mailbox, currentMailboxID 
 								@FilterLink(mb.ID, "unread", "Unread")
 								@FilterLink(mb.ID, "read", "Read")
 								@FilterLink(mb.ID, "starred", "Starred")
+								@FilterLink(mb.ID, "sent", "Sent")
 								@FilterLink(mb.ID, "quarantined", "Quarantined")
 								@FilterLink(mb.ID, "deleted", "Trash")
 								if mb.ID == currentMailboxID {
@@ -226,7 +227,11 @@ templ SearchContent(mailboxID uuid.UUID, query string, emails []models.Email) {
 							<div class="flex-1 min-w-0">
 								<div class="flex items-center justify-between">
 									<p class={ "text-sm truncate", templ.KV("font-bold text-gray-900", !email.IsRead), templ.KV("text-gray-600", email.IsRead) }>
-										{ email.FromAddress }
+										if email.Direction == models.DirectionOutbound {
+											To: { email.ToAddress }
+										} else {
+											{ email.FromAddress }
+										}
 									</p>
 									<p class="text-xs text-gray-400 group-hover:text-gray-500" data-local-time={ email.ReceiveDatetime.Format("2006-01-02T15:04:05Z07:00") } data-format="list">
 										{ email.ReceiveDatetime.Format("Jan 02, 15:04") }
@@ -266,6 +271,8 @@ templ MailboxContent(mailboxID uuid.UUID, filter string, emails []models.Email) 
 		<h2 class="text-lg font-bold text-gray-900 uppercase tracking-tight">
 			if filter == "" || filter == "all" {
 				Inbox
+			} else if filter == "sent" {
+				Sent
 			} else {
 				{ filter }
 			}
@@ -302,7 +309,11 @@ templ MailboxContent(mailboxID uuid.UUID, filter string, emails []models.Email) 
 							<div class="flex-1 min-w-0">
 								<div class="flex items-center justify-between">
 									<p class={ "text-sm truncate", templ.KV("font-bold text-gray-900", !email.IsRead), templ.KV("text-gray-600", email.IsRead) }>
-										{ email.FromAddress }
+										if filter == "sent" {
+											To: { email.ToAddress }
+										} else {
+											{ email.FromAddress }
+										}
 									</p>
 									<p class="text-xs text-gray-400 group-hover:text-gray-500" data-local-time={ email.ReceiveDatetime.Format("2006-01-02T15:04:05Z07:00") } data-format="list">
 										{ email.ReceiveDatetime.Format("Jan 02, 15:04") }
