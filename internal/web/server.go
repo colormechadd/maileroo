@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"crypto/rand"
+	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
@@ -26,6 +27,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/google/uuid"
+	"github.com/gorilla/csrf"
 )
 
 type Server struct {
@@ -50,7 +52,18 @@ func NewServer(cfg config.Config, webDB db.WebDB, rateLimitDB db.RateLimitDB, st
 	}
 }
 
-func (s *Server) Routes() chi.Router {
+func (s *Server) Routes() http.Handler {
+	csrfKey, err := base64.StdEncoding.DecodeString(s.cfg.Web.CSRFAuthKey)
+	if err != nil || len(csrfKey) != 32 {
+		panic("WEB_CSRF_AUTH_KEY must be a base64-encoded 32-byte key")
+	}
+	csrfMiddleware := csrf.Protect(
+		csrfKey,
+		csrf.Secure(true),
+		csrf.RequestHeader("X-CSRF-Token"),
+		csrf.FieldName("gorilla.csrf.Token"),
+	)
+
 	r := chi.NewRouter()
 
 	r.Use(middleware.RequestID)
@@ -62,7 +75,7 @@ func (s *Server) Routes() chi.Router {
 	fs := http.FileServer(http.Dir("static"))
 	r.Handle("/static/*", http.StripPrefix("/static/", fs))
 
-	r.Get("/login", templ.Handler(templates.LoginPage("")).ServeHTTP)
+	r.Get("/login", s.handleLoginGet)
 	r.Post("/login", s.handleLoginPost)
 	r.Post("/logout", s.handleLogout)
 
@@ -94,7 +107,7 @@ func (s *Server) Routes() chi.Router {
 		r.Delete("/draft/{draftID}", s.handleDraftDelete)
 	})
 
-	return r
+	return csrfMiddleware(r)
 }
 
 func (s *Server) handleCompose(w http.ResponseWriter, r *http.Request) {
@@ -508,12 +521,16 @@ func (s *Server) handleEvents(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+func (s *Server) handleLoginGet(w http.ResponseWriter, r *http.Request) {
+	templates.LoginPage("", csrf.Token(r)).Render(r.Context(), w)
+}
+
 func (s *Server) render(w http.ResponseWriter, r *http.Request, user *models.User, mailboxes []models.Mailbox, currentMailboxID uuid.UUID, filter string, draftCount int, content templ.Component) {
 	if r.Header.Get("HX-Request") == "true" {
 		content.Render(r.Context(), w)
 		return
 	}
-	templates.Dashboard(user, mailboxes, currentMailboxID, filter, draftCount, content).Render(r.Context(), w)
+	templates.Dashboard(user, mailboxes, currentMailboxID, filter, draftCount, content, csrf.Token(r)).Render(r.Context(), w)
 }
 
 func (s *Server) draftCount(ctx context.Context, mailboxID uuid.UUID, userID uuid.UUID) int {
@@ -910,14 +927,14 @@ func (s *Server) handleLoginPost(w http.ResponseWriter, r *http.Request) {
 	user, err := s.db.GetUserByUsername(r.Context(), username)
 	if err != nil || !user.IsActive {
 		slog.Warn("login failed: user not found or inactive", "username", username)
-		templates.LoginPage("Invalid credentials").Render(r.Context(), w)
+		templates.LoginPage("Invalid credentials", csrf.Token(r)).Render(r.Context(), w)
 		return
 	}
 
 	match, err := auth.ComparePassword(password, user.PasswordHash)
 	if err != nil || !match {
 		slog.Warn("login failed: incorrect password", "username", username)
-		templates.LoginPage("Invalid credentials").Render(r.Context(), w)
+		templates.LoginPage("Invalid credentials", csrf.Token(r)).Render(r.Context(), w)
 		return
 	}
 

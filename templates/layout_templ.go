@@ -8,7 +8,7 @@ package templates
 import "github.com/a-h/templ"
 import templruntime "github.com/a-h/templ/runtime"
 
-func Layout(title string) templ.Component {
+func Layout(title string, csrfToken string) templ.Component {
 	return templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
 		templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
 		if templ_7745c5c3_CtxErr := ctx.Err(); templ_7745c5c3_CtxErr != nil {
@@ -42,7 +42,20 @@ func Layout(title string) templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 2, " - Maileroo</title><link rel=\"icon\" type=\"image/png\" href=\"/static/img/favicon.png\"><link rel=\"stylesheet\" href=\"/static/css/output.css\"><script src=\"https://unpkg.com/htmx.org@2.0.4\"></script><script src=\"https://unpkg.com/htmx-ext-sse@2.2.2/sse.js\"></script><script defer src=\"https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js\"></script><link rel=\"stylesheet\" type=\"text/css\" href=\"https://unpkg.com/trix@2.0.8/dist/trix.css\"><script type=\"text/javascript\" src=\"https://unpkg.com/trix@2.0.8/dist/trix.umd.min.js\"></script><style>\n\t\t\t\t[x-cloak] { display: none !important; }\n\t\t\t\ttrix-toolbar [data-trix-button-group=\"file-tools\"] { display: none !important; }\n\t\t\t\ttrix-editor { \n\t\t\t\t\tmin-height: 300px !important; \n\t\t\t\t\tborder: none !important; \n\t\t\t\t\tpadding: 1.5rem !important;\n\t\t\t\t\toutline: none !important;\n\t\t\t\t}\n\t\t\t\ttrix-toolbar {\n\t\t\t\t\tborder-bottom: 1px solid #f3e8ff !important;\n\t\t\t\t\tpadding-top: 0.5rem !important;\n\t\t\t\t\tpadding-bottom: 0.5rem !important;\n\t\t\t\t}\n\t\t\t</style><script>\n\t\t\t\tfunction formatLocalTimes() {\n\t\t\t\t\tdocument.querySelectorAll('[data-local-time]').forEach(el => {\n\t\t\t\t\t\tconst date = new Date(el.getAttribute('data-local-time'));\n\t\t\t\t\t\tconst format = el.getAttribute('data-format') || 'short';\n\t\t\t\t\t\t\n\t\t\t\t\t\tlet options = {\n\t\t\t\t\t\t\thour: 'numeric',\n\t\t\t\t\t\t\tminute: '2-digit',\n\t\t\t\t\t\t\thour12: true\n\t\t\t\t\t\t};\n\n\t\t\t\t\t\tif (format === 'full') {\n\t\t\t\t\t\t\toptions = { \n\t\t\t\t\t\t\t\tweekday: 'long', \n\t\t\t\t\t\t\t\tyear: 'numeric', \n\t\t\t\t\t\t\t\tmonth: 'long', \n\t\t\t\t\t\t\t\tday: 'numeric',\n\t\t\t\t\t\t\t\thour: 'numeric',\n\t\t\t\t\t\t\t\tminute: '2-digit',\n\t\t\t\t\t\t\t\thour12: true\n\t\t\t\t\t\t\t};\n\t\t\t\t\t\t} else if (format === 'list') {\n\t\t\t\t\t\t\toptions = {\n\t\t\t\t\t\t\t\tmonth: 'short',\n\t\t\t\t\t\t\t\tday: 'numeric',\n\t\t\t\t\t\t\t\thour: 'numeric',\n\t\t\t\t\t\t\t\tminute: '2-digit',\n\t\t\t\t\t\t\t\thour12: true\n\t\t\t\t\t\t\t};\n\t\t\t\t\t\t}\n\n\t\t\t\t\t\tel.textContent = new Intl.DateTimeFormat('default', options).format(date);\n\t\t\t\t\t\tel.removeAttribute('data-local-time'); // Prevent re-processing\n\t\t\t\t\t});\n\t\t\t\t}\n\n\t\t\t\tdocument.addEventListener('DOMContentLoaded', formatLocalTimes);\n\t\t\t\tdocument.addEventListener('htmx:afterSettle', formatLocalTimes);\n\t\t\t</script></head><body class=\"h-full bg-purple-50 text-gray-900 font-sans antialiased\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 2, " - Maileroo</title><meta name=\"csrf-token\" content=\"")
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		var templ_7745c5c3_Var3 string
+		templ_7745c5c3_Var3, templ_7745c5c3_Err = templ.JoinStringErrs(csrfToken)
+		if templ_7745c5c3_Err != nil {
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `templates/layout.templ`, Line: 10, Col: 46}
+		}
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var3))
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 3, "\"><link rel=\"icon\" type=\"image/png\" href=\"/static/img/favicon.png\"><link rel=\"stylesheet\" href=\"/static/css/output.css\"><script src=\"https://unpkg.com/htmx.org@2.0.4\"></script><script src=\"https://unpkg.com/htmx-ext-sse@2.2.2/sse.js\"></script><script defer src=\"https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js\"></script><link rel=\"stylesheet\" type=\"text/css\" href=\"https://unpkg.com/trix@2.0.8/dist/trix.css\"><script type=\"text/javascript\" src=\"https://unpkg.com/trix@2.0.8/dist/trix.umd.min.js\"></script><style>\n\t\t\t\t[x-cloak] { display: none !important; }\n\t\t\t\ttrix-toolbar [data-trix-button-group=\"file-tools\"] { display: none !important; }\n\t\t\t\ttrix-editor { \n\t\t\t\t\tmin-height: 300px !important; \n\t\t\t\t\tborder: none !important; \n\t\t\t\t\tpadding: 1.5rem !important;\n\t\t\t\t\toutline: none !important;\n\t\t\t\t}\n\t\t\t\ttrix-toolbar {\n\t\t\t\t\tborder-bottom: 1px solid #f3e8ff !important;\n\t\t\t\t\tpadding-top: 0.5rem !important;\n\t\t\t\t\tpadding-bottom: 0.5rem !important;\n\t\t\t\t}\n\t\t\t</style><script>\n\t\t\t\tfunction formatLocalTimes() {\n\t\t\t\t\tdocument.querySelectorAll('[data-local-time]').forEach(el => {\n\t\t\t\t\t\tconst date = new Date(el.getAttribute('data-local-time'));\n\t\t\t\t\t\tconst format = el.getAttribute('data-format') || 'short';\n\t\t\t\t\t\t\n\t\t\t\t\t\tlet options = {\n\t\t\t\t\t\t\thour: 'numeric',\n\t\t\t\t\t\t\tminute: '2-digit',\n\t\t\t\t\t\t\thour12: true\n\t\t\t\t\t\t};\n\n\t\t\t\t\t\tif (format === 'full') {\n\t\t\t\t\t\t\toptions = { \n\t\t\t\t\t\t\t\tweekday: 'long', \n\t\t\t\t\t\t\t\tyear: 'numeric', \n\t\t\t\t\t\t\t\tmonth: 'long', \n\t\t\t\t\t\t\t\tday: 'numeric',\n\t\t\t\t\t\t\t\thour: 'numeric',\n\t\t\t\t\t\t\t\tminute: '2-digit',\n\t\t\t\t\t\t\t\thour12: true\n\t\t\t\t\t\t\t};\n\t\t\t\t\t\t} else if (format === 'list') {\n\t\t\t\t\t\t\toptions = {\n\t\t\t\t\t\t\t\tmonth: 'short',\n\t\t\t\t\t\t\t\tday: 'numeric',\n\t\t\t\t\t\t\t\thour: 'numeric',\n\t\t\t\t\t\t\t\tminute: '2-digit',\n\t\t\t\t\t\t\t\thour12: true\n\t\t\t\t\t\t\t};\n\t\t\t\t\t\t}\n\n\t\t\t\t\t\tel.textContent = new Intl.DateTimeFormat('default', options).format(date);\n\t\t\t\t\t\tel.removeAttribute('data-local-time'); // Prevent re-processing\n\t\t\t\t\t});\n\t\t\t\t}\n\n\t\t\t\tdocument.addEventListener('DOMContentLoaded', formatLocalTimes);\n\t\t\t\tdocument.addEventListener('htmx:afterSettle', formatLocalTimes);\n\t\t\t\tdocument.addEventListener('htmx:configRequest', function(e) {\n\t\t\t\t\tconst token = document.querySelector('meta[name=\"csrf-token\"]');\n\t\t\t\t\tif (token) e.detail.headers['X-CSRF-Token'] = token.content;\n\t\t\t\t});\n\t\t\t</script></head><body class=\"h-full bg-purple-50 text-gray-900 font-sans antialiased\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -50,7 +63,7 @@ func Layout(title string) templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 3, "</body></html>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 4, "</body></html>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}

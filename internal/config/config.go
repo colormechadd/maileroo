@@ -69,6 +69,10 @@ type Config struct {
 		EncryptionKey string `mapstructure:"ENCRYPTION_KEY"`
 	} `mapstructure:"DKIM"`
 
+	Web struct {
+		CSRFAuthKey string `mapstructure:"CSRF_AUTH_KEY"`
+	} `mapstructure:"WEB"`
+
 	LocalStorage LocalStorageConfig `mapstructure:"LOCAL_STORAGE"`
 	S3Storage    S3StorageConfig    `mapstructure:"S3_STORAGE"`
 	GCSStorage   GCSStorageConfig   `mapstructure:"GCS_STORAGE"`

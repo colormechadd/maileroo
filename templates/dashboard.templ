@@ -82,8 +82,8 @@ templ FilterLinkWithCount(mailboxID uuid.UUID, filterName string, label string, 
 	</a>
 }
 
-templ Dashboard(user *models.User, mailboxes []models.Mailbox, currentMailboxID uuid.UUID, filter string, draftCount int, content templ.Component) {
-	@Layout("Dashboard") {
+templ Dashboard(user *models.User, mailboxes []models.Mailbox, currentMailboxID uuid.UUID, filter string, draftCount int, content templ.Component, csrfToken string) {
+	@Layout("Dashboard", csrfToken) {
 		<div class="flex h-screen w-full overflow-hidden" 
 			 id="dashboard-root"
 			 hx-ext="sse"
@@ -168,6 +168,7 @@ templ Dashboard(user *models.User, mailboxes []models.Mailbox, currentMailboxID 
 						</div>
 					</div>
 					<form action="/logout" method="POST" class="mt-4">
+						<input type="hidden" name="gorilla.csrf.Token" value={ csrfToken }/>
 						<button type="submit" class="w-full text-left px-4 py-2 text-sm font-medium text-red-600 hover:bg-red-50 rounded-lg transition-colors cursor-pointer">
 							Sign out
 						</button>

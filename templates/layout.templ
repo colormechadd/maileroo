@@ -1,12 +1,13 @@
 package templates
 
-templ Layout(title string) {
+templ Layout(title string, csrfToken string) {
 	<!DOCTYPE html>
 	<html lang="en" class="h-full">
 		<head>
 			<meta charset="UTF-8"/>
 			<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
 			<title>{ title } - Maileroo</title>
+			<meta name="csrf-token" content={ csrfToken }/>
 			<link rel="icon" type="image/png" href="/static/img/favicon.png"/>
 			<link rel="stylesheet" href="/static/css/output.css"/>
 			<script src="https://unpkg.com/htmx.org@2.0.4"></script>
@@ -68,6 +69,10 @@ templ Layout(title string) {
 
 				document.addEventListener('DOMContentLoaded', formatLocalTimes);
 				document.addEventListener('htmx:afterSettle', formatLocalTimes);
+				document.addEventListener('htmx:configRequest', function(e) {
+					const token = document.querySelector('meta[name="csrf-token"]');
+					if (token) e.detail.headers['X-CSRF-Token'] = token.content;
+				});
 			</script>
 		</head>
 		<body class="h-full bg-purple-50 text-gray-900 font-sans antialiased">
