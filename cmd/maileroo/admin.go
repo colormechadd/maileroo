@@ -208,6 +208,11 @@ var mappingAddCmd = &cobra.Command{
 			log.Fatalf("invalid mailbox ID: %v", err)
 		}
 
+		var valid bool
+		if err := database.QueryRowContext(context.Background(), `SELECT '' ~ $1`, args[1]).Scan(&valid); err != nil {
+			log.Fatalf("invalid address pattern (not a valid PostgreSQL regex): %v", err)
+		}
+
 		var priority int
 		fmt.Sscanf(args[2], "%d", &priority)
 
