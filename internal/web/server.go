@@ -11,8 +11,11 @@ import (
 	"html"
 	"io"
 	"log/slog"
+	"mime"
+	"net"
 	"net/http"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/a-h/templ"
@@ -28,6 +31,7 @@ import (
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/google/uuid"
 	"github.com/gorilla/csrf"
+	"golang.org/x/time/rate"
 )
 
 type Server struct {
@@ -38,18 +42,57 @@ type Server struct {
 	hub         *Hub
 	sender      outbound.Sender
 	mail        *mail.Service
+
+	loginMu       sync.Mutex
+	loginLimiters map[string]*loginEntry
+}
+
+type loginEntry struct {
+	limiter  *rate.Limiter
+	lastSeen time.Time
+}
+
+func (s *Server) loginLimiter(ip string) *rate.Limiter {
+	s.loginMu.Lock()
+	defer s.loginMu.Unlock()
+	if e, ok := s.loginLimiters[ip]; ok {
+		e.lastSeen = time.Now()
+		return e.limiter
+	}
+	e := &loginEntry{
+		limiter:  rate.NewLimiter(rate.Every(time.Minute), 5),
+		lastSeen: time.Now(),
+	}
+	s.loginLimiters[ip] = e
+	return e.limiter
+}
+
+func (s *Server) cleanupLoginLimiters() {
+	for {
+		time.Sleep(5 * time.Minute)
+		s.loginMu.Lock()
+		for ip, e := range s.loginLimiters {
+			if time.Since(e.lastSeen) > time.Hour {
+				delete(s.loginLimiters, ip)
+			}
+		}
+		s.loginMu.Unlock()
+	}
 }
 
 func NewServer(cfg config.Config, webDB db.WebDB, rateLimitDB db.RateLimitDB, storage storage.Storage, hub *Hub, sender outbound.Sender, mailSvc *mail.Service) *Server {
-	return &Server{
-		cfg:         cfg,
-		db:          webDB,
-		rateLimitDB: rateLimitDB,
-		storage:     storage,
-		hub:         hub,
-		sender:      sender,
-		mail:        mailSvc,
+	s := &Server{
+		cfg:           cfg,
+		db:            webDB,
+		rateLimitDB:   rateLimitDB,
+		storage:       storage,
+		hub:           hub,
+		sender:        sender,
+		mail:          mailSvc,
+		loginLimiters: make(map[string]*loginEntry),
 	}
+	go s.cleanupLoginLimiters()
+	return s
 }
 
 func (s *Server) Routes() http.Handler {
@@ -921,12 +964,32 @@ func (s *Server) AuthMiddleware(next http.Handler) http.Handler {
 }
 
 func (s *Server) handleLoginPost(w http.ResponseWriter, r *http.Request) {
+	remoteIP, _, _ := net.SplitHostPort(r.RemoteAddr)
+	if remoteIP == "" {
+		remoteIP = r.RemoteAddr
+	}
+
 	username := r.FormValue("username")
 	password := r.FormValue("password")
+
+	// recordFailure consumes a token from the per-IP limiter and, if exhausted,
+	// returns true to signal that the caller should reject with 429.
+	recordFailure := func() bool {
+		limiter := s.loginLimiter(remoteIP)
+		if !limiter.Allow() {
+			slog.Warn("login rate limited", "ip", remoteIP)
+			http.Error(w, "Too many failed login attempts, please try again later", http.StatusTooManyRequests)
+			return true
+		}
+		return false
+	}
 
 	user, err := s.db.GetUserByUsername(r.Context(), username)
 	if err != nil || !user.IsActive {
 		slog.Warn("login failed: user not found or inactive", "username", username)
+		if recordFailure() {
+			return
+		}
 		templates.LoginPage("Invalid credentials", csrf.Token(r)).Render(r.Context(), w)
 		return
 	}
@@ -934,6 +997,9 @@ func (s *Server) handleLoginPost(w http.ResponseWriter, r *http.Request) {
 	match, err := auth.ComparePassword(password, user.PasswordHash)
 	if err != nil || !match {
 		slog.Warn("login failed: incorrect password", "username", username)
+		if recordFailure() {
+			return
+		}
 		templates.LoginPage("Invalid credentials", csrf.Token(r)).Render(r.Context(), w)
 		return
 	}
@@ -1014,7 +1080,7 @@ func (s *Server) handleAttachmentDownload(w http.ResponseWriter, r *http.Request
 	}
 
 	w.Header().Set("Content-Type", att.ContentType)
-	w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=\"%s\"", att.Filename))
+	w.Header().Set("Content-Disposition", mime.FormatMediaType("attachment", map[string]string{"filename": att.Filename}))
 	io.Copy(w, bodyReader)
 }
 
