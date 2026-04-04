@@ -312,6 +312,24 @@ func (s *Service) FetchBody(ctx context.Context, email *models.Email) (string, b
 	return content, isHTML, nil
 }
 
+func (s *Service) FetchRaw(ctx context.Context, email *models.Email) ([]byte, error) {
+	rc, err := s.storage.Get(ctx, email.StorageKey)
+	if err != nil {
+		return nil, err
+	}
+	defer rc.Close()
+
+	bodyReader, err := s.DecompressReader(rc, email.StorageKey)
+	if err != nil {
+		return nil, err
+	}
+	if closer, ok := bodyReader.(io.Closer); ok {
+		defer closer.Close()
+	}
+
+	return io.ReadAll(bodyReader)
+}
+
 func (s *Service) FetchHeaders(ctx context.Context, email *models.Email) (string, error) {
 	rc, err := s.storage.Get(ctx, email.StorageKey)
 	if err != nil {

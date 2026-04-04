@@ -18,6 +18,7 @@ import (
 	"github.com/colormechadd/maileroo/internal/mail"
 	"github.com/colormechadd/maileroo/internal/outbound"
 	"github.com/colormechadd/maileroo/internal/pipeline"
+	"github.com/colormechadd/maileroo/internal/rspamd"
 	"github.com/colormechadd/maileroo/internal/smtp"
 	"github.com/colormechadd/maileroo/internal/storage"
 	"github.com/colormechadd/maileroo/internal/web"
@@ -95,7 +96,8 @@ func runServe() {
 	mailSvc := mail.NewService(database, store, cfg.Compression)
 
 	// Initialize Pipeline
-	ingestionPipeline := pipeline.NewPipeline(cfg, database, store, hub, mailSvc)
+	rspamdClient := rspamd.NewClient(cfg.Spam.RspamdURL)
+	ingestionPipeline := pipeline.NewPipeline(cfg, database, store, hub, mailSvc, rspamdClient)
 
 	// Initialize MTA
 	var dkimSigner *outbound.DKIMSigner
@@ -163,7 +165,7 @@ func runServe() {
 	}()
 
 	// Initialize Web Server
-	webServer := web.NewServer(*cfg, database, database, store, hub, mta, mailSvc)
+	webServer := web.NewServer(*cfg, database, database, store, hub, mta, mailSvc, rspamdClient)
 
 	// Start Web server (Chi)
 	go func() {

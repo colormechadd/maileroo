@@ -10,6 +10,7 @@ import (
 	"github.com/colormechadd/maileroo/internal/config"
 	"github.com/colormechadd/maileroo/internal/db"
 	"github.com/colormechadd/maileroo/internal/mail"
+	"github.com/colormechadd/maileroo/internal/rspamd"
 	"github.com/colormechadd/maileroo/internal/storage"
 	"github.com/colormechadd/maileroo/pkg/models"
 	"github.com/google/uuid"
@@ -44,19 +45,21 @@ type Pipeline struct {
 	storage storage.Storage
 	hub     Broadcaster
 	mail    *mail.Service
+	rspamd  *rspamd.Client
 	steps   []struct {
 		name string
 		fn   Step
 	}
 }
 
-func NewPipeline(cfg *config.Config, db db.PipelineDB, storage storage.Storage, hub Broadcaster, mailSvc *mail.Service) *Pipeline {
+func NewPipeline(cfg *config.Config, db db.PipelineDB, storage storage.Storage, hub Broadcaster, mailSvc *mail.Service, rspamdClient *rspamd.Client) *Pipeline {
 	p := &Pipeline{
 		cfg:     cfg,
 		db:      db,
 		storage: storage,
 		hub:     hub,
 		mail:    mailSvc,
+		rspamd:  rspamdClient,
 	}
 
 	p.steps = []struct {
@@ -67,6 +70,7 @@ func NewPipeline(cfg *config.Config, db db.PipelineDB, storage storage.Storage, 
 		{"parse_dsn", ParseDSN},
 		{"validate_sender", ValidateSender},
 		{"spam", ValidateRBL},
+		{"check_spam", CheckSpam},
 		{"block", CheckBlockingRules},
 		{"finalize", Finalize},
 		{"notify", Notify},

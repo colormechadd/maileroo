@@ -56,7 +56,9 @@ type Config struct {
 	} `mapstructure:"LOG"`
 
 	Spam struct {
-		RBLServers []string `mapstructure:"RBL_SERVERS"`
+		RBLServers          []string `mapstructure:"RBL_SERVERS"`
+		RspamdURL           string   `mapstructure:"RSPAMD_URL"`
+		QuarantineThreshold float64  `mapstructure:"QUARANTINE_THRESHOLD"`
 	} `mapstructure:"SPAM"`
 
 	SMTP      SMTPConfig      `mapstructure:"SMTP"`
@@ -82,6 +84,8 @@ func LoadConfig() (*Config, error) {
 	viper.SetDefault("LOG.LEVEL", "info")
 	viper.SetDefault("LOG.FORMAT", "text")
 	viper.SetDefault("SPAM.RBL_SERVERS", []string{"zen.spamhaus.org"})
+	viper.SetDefault("SPAM.RSPAMD_URL", "")
+	viper.SetDefault("SPAM.QUARANTINE_THRESHOLD", 5.0)
 
 	viper.SetDefault("WEB_PORT", 8080)
 	viper.SetDefault("SMTP.PORTS", []int{25})
@@ -164,6 +168,12 @@ func BindFlags(fs *pflag.FlagSet) {
 
 	fs.StringSlice("spam-rbl-servers", []string{"zen.spamhaus.org"}, "Spam RBL servers")
 	viper.BindPFlag("SPAM.RBL_SERVERS", fs.Lookup("spam-rbl-servers"))
+
+	fs.String("spam-rspamd-url", "", "Rspamd HTTP base URL (e.g. http://localhost:11333)")
+	viper.BindPFlag("SPAM.RSPAMD_URL", fs.Lookup("spam-rspamd-url"))
+
+	fs.Float64("spam-quarantine-threshold", 5.0, "Spam score threshold for quarantine")
+	viper.BindPFlag("SPAM.QUARANTINE_THRESHOLD", fs.Lookup("spam-quarantine-threshold"))
 
 	fs.IntSlice("smtp-ports", []int{25}, "SMTP ports to listen on")
 	viper.BindPFlag("SMTP.PORTS", fs.Lookup("smtp-ports"))

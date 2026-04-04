@@ -23,6 +23,7 @@ import (
 	"github.com/colormechadd/maileroo/internal/db"
 	"github.com/colormechadd/maileroo/internal/mail"
 	"github.com/colormechadd/maileroo/internal/outbound"
+	"github.com/colormechadd/maileroo/internal/rspamd"
 	"github.com/colormechadd/maileroo/internal/storage"
 	"github.com/colormechadd/maileroo/pkg/auth"
 	"github.com/colormechadd/maileroo/pkg/models"
@@ -42,6 +43,7 @@ type Server struct {
 	hub         *Hub
 	sender      outbound.Sender
 	mail        *mail.Service
+	rspamd      *rspamd.Client
 
 	loginMu       sync.Mutex
 	loginLimiters map[string]*loginEntry
@@ -80,7 +82,7 @@ func (s *Server) cleanupLoginLimiters() {
 	}
 }
 
-func NewServer(cfg config.Config, webDB db.WebDB, rateLimitDB db.RateLimitDB, storage storage.Storage, hub *Hub, sender outbound.Sender, mailSvc *mail.Service) *Server {
+func NewServer(cfg config.Config, webDB db.WebDB, rateLimitDB db.RateLimitDB, storage storage.Storage, hub *Hub, sender outbound.Sender, mailSvc *mail.Service, rspamdClient *rspamd.Client) *Server {
 	s := &Server{
 		cfg:           cfg,
 		db:            webDB,
@@ -89,6 +91,7 @@ func NewServer(cfg config.Config, webDB db.WebDB, rateLimitDB db.RateLimitDB, st
 		hub:           hub,
 		sender:        sender,
 		mail:          mailSvc,
+		rspamd:        rspamdClient,
 		loginLimiters: make(map[string]*loginEntry),
 	}
 	go s.cleanupLoginLimiters()
@@ -137,6 +140,8 @@ func (s *Server) Routes() http.Handler {
 			r.Post("/email/{emailID}/star", s.handleEmailStar)
 			r.Post("/email/{emailID}/delete", s.handleEmailDelete)
 			r.Post("/email/{emailID}/release", s.handleEmailRelease)
+			r.Post("/email/{emailID}/mark-spam", s.handleEmailMarkSpam)
+			r.Post("/email/{emailID}/mark-ham", s.handleEmailMarkHam)
 		})
 		r.Get("/attachment/{attachmentID}", s.handleAttachmentDownload)
 
@@ -858,6 +863,60 @@ func (s *Server) handleEmailRelease(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	http.Redirect(w, r, "/mailbox/"+email.MailboxID.String()+"?filter=quarantined", http.StatusSeeOther)
+}
+
+func (s *Server) handleEmailMarkSpam(w http.ResponseWriter, r *http.Request) {
+	s.handleEmailLearn(w, r, true, models.StatusQuarantined)
+}
+
+func (s *Server) handleEmailMarkHam(w http.ResponseWriter, r *http.Request) {
+	s.handleEmailLearn(w, r, false, models.StatusInbox)
+}
+
+func (s *Server) handleEmailLearn(w http.ResponseWriter, r *http.Request, spam bool, targetStatus models.EmailStatus) {
+	user := r.Context().Value("user").(*models.User)
+	emailID, err := uuid.Parse(chi.URLParam(r, "emailID"))
+	if err != nil {
+		http.Error(w, "Invalid ID", http.StatusBadRequest)
+		return
+	}
+
+	email, err := s.db.GetEmailByIDForUser(r.Context(), emailID, user.ID)
+	if err != nil {
+		slog.Error("failed to fetch email for spam learning", "email_id", emailID, "error", err)
+		http.Error(w, "Not found", http.StatusNotFound)
+		return
+	}
+
+	if err := s.db.UpdateEmailStatus(r.Context(), emailID, user.ID, targetStatus); err != nil {
+		slog.Error("failed to update email status for spam learning", "email_id", emailID, "error", err)
+		http.Error(w, "Error", http.StatusInternalServerError)
+		return
+	}
+
+	if s.rspamd != nil {
+		raw, err := s.mail.FetchRaw(r.Context(), email)
+		if err != nil {
+			slog.Error("failed to fetch raw email for rspamd learning", "email_id", emailID, "error", err)
+		} else {
+			var learnErr error
+			if spam {
+				learnErr = s.rspamd.LearnSpam(r.Context(), raw)
+			} else {
+				learnErr = s.rspamd.LearnHam(r.Context(), raw)
+			}
+			if learnErr != nil {
+				slog.Error("rspamd learn failed", "email_id", emailID, "spam", spam, "error", learnErr)
+			}
+		}
+	}
+
+	redirectURL := "/email/" + emailID.String()
+	if r.Header.Get("HX-Request") == "true" {
+		w.Header().Set("HX-Redirect", redirectURL)
+		return
+	}
+	http.Redirect(w, r, redirectURL, http.StatusSeeOther)
 }
 
 func (s *Server) handleEmailHeaders(w http.ResponseWriter, r *http.Request) {
