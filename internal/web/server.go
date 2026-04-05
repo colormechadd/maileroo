@@ -299,7 +299,8 @@ func (s *Server) handleCompose(w http.ResponseWriter, r *http.Request) {
 	}
 
 	mailboxes, _ := s.DB.GetMailboxesByUserID(r.Context(), user.ID)
-	s.render(w, r, user, mailboxes, uuid.Nil, "all", 0, templates.Compose(addresses, fromID, to, cc, bcc, subject, inReplyTo, references, draftID, title, body, bodyHTML))
+	counts := s.getCounts(r.Context(), uuid.Nil, user.ID) // No specific mailbox context here
+	s.render(w, r, user, mailboxes, uuid.Nil, "all", counts, templates.Compose(addresses, fromID, to, cc, bcc, subject, inReplyTo, references, draftID, title, body, bodyHTML))
 }
 
 func (s *Server) validateUserAccessToEmailID(next http.Handler) http.Handler {
@@ -587,12 +588,12 @@ func (s *Server) handleLoginGet(w http.ResponseWriter, r *http.Request) {
 	templates.LoginPage("", csrf.Token(r)).Render(r.Context(), w)
 }
 
-func (s *Server) render(w http.ResponseWriter, r *http.Request, user *models.User, mailboxes []models.Mailbox, currentMailboxID uuid.UUID, filter string, draftCount int, content templ.Component) {
+func (s *Server) render(w http.ResponseWriter, r *http.Request, user *models.User, mailboxes []models.Mailbox, currentMailboxID uuid.UUID, filter string, counts map[string]int, content templ.Component) {
 	if r.Header.Get("HX-Request") == "true" {
 		content.Render(r.Context(), w)
 		return
 	}
-	templates.Dashboard(user, mailboxes, currentMailboxID, filter, draftCount, content, csrf.Token(r)).Render(r.Context(), w)
+	templates.Dashboard(user, mailboxes, currentMailboxID, filter, counts, content, csrf.Token(r)).Render(r.Context(), w)
 }
 
 func (s *Server) draftCount(ctx context.Context, mailboxID uuid.UUID, userID uuid.UUID) int {
@@ -601,6 +602,25 @@ func (s *Server) draftCount(ctx context.Context, mailboxID uuid.UUID, userID uui
 	}
 	count, _ := s.DB.CountDraftsByMailboxID(ctx, mailboxID, userID)
 	return count
+}
+
+func (s *Server) getCounts(ctx context.Context, mailboxID, userID uuid.UUID) map[string]int {
+	counts := make(map[string]int)
+	if mailboxID == uuid.Nil {
+		return counts
+	}
+
+	// For now, let's just get the ones we need for the UI
+	unread, _ := s.DB.CountEmailsByMailboxID(ctx, mailboxID, "unread")
+	counts["unread"] = unread
+
+	drafts, _ := s.DB.CountDraftsByMailboxID(ctx, mailboxID, userID)
+	counts["drafts"] = drafts
+
+	// Also count Inbox specifically for the top link if current mailbox is Inbox
+	// But actually the Inbox link at the top should probably always show the Inbox count.
+	// For simplicity, let's just use what's available.
+	return counts
 }
 
 func (s *Server) handleDashboard(w http.ResponseWriter, r *http.Request) {
@@ -624,7 +644,7 @@ func (s *Server) handleDashboard(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	s.render(w, r, user, mailboxes, uuid.Nil, "all", 0, templates.MailboxContent(uuid.Nil, "all", nil))
+	s.render(w, r, user, mailboxes, uuid.Nil, "all", nil, templates.MailboxContent(uuid.Nil, "all", nil))
 }
 
 func (s *Server) handleMailboxView(w http.ResponseWriter, r *http.Request) {
@@ -659,7 +679,7 @@ func (s *Server) handleMailboxView(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	dc := s.draftCount(r.Context(), mailboxID, user.ID)
+	counts := s.getCounts(r.Context(), mailboxID, user.ID)
 
 	if filter == "drafts" {
 		drafts, err := s.DB.GetDraftsByMailboxID(r.Context(), mailboxID, user.ID)
@@ -668,7 +688,7 @@ func (s *Server) handleMailboxView(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "Internal error", http.StatusInternalServerError)
 			return
 		}
-		s.render(w, r, user, mailboxes, mailboxID, filter, dc, templates.DraftsContent(mailboxID, drafts))
+		s.render(w, r, user, mailboxes, mailboxID, filter, counts, templates.DraftsContent(mailboxID, drafts))
 		return
 	}
 
@@ -679,7 +699,7 @@ func (s *Server) handleMailboxView(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	s.render(w, r, user, mailboxes, mailboxID, filter, dc, templates.MailboxContent(mailboxID, filter, emails))
+	s.render(w, r, user, mailboxes, mailboxID, filter, counts, templates.MailboxContent(mailboxID, filter, emails))
 }
 
 func (s *Server) handleMailboxSearch(w http.ResponseWriter, r *http.Request) {
@@ -722,8 +742,8 @@ func (s *Server) handleMailboxSearch(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	dc := s.draftCount(r.Context(), mailboxID, user.ID)
-	s.render(w, r, user, mailboxes, mailboxID, "search", dc, templates.SearchContent(mailboxID, query, emails))
+	counts := s.getCounts(r.Context(), mailboxID, user.ID)
+	s.render(w, r, user, mailboxes, mailboxID, "search", counts, templates.SearchContent(mailboxID, query, emails))
 }
 
 func (s *Server) handleEmailView(w http.ResponseWriter, r *http.Request) {
@@ -766,7 +786,8 @@ func (s *Server) handleEmailView(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	s.render(w, r, user, mailboxes, email.MailboxID, "all", 0, templates.EmailDetail(email, attachments, content, isHTML))
+	counts := s.getCounts(r.Context(), email.MailboxID, user.ID)
+	s.render(w, r, user, mailboxes, email.MailboxID, "all", counts, templates.EmailDetail(email, attachments, content, isHTML))
 }
 
 func (s *Server) handleEmailStar(w http.ResponseWriter, r *http.Request) {
@@ -945,7 +966,8 @@ func (s *Server) handleEmailHeaders(w http.ResponseWriter, r *http.Request) {
 		slog.Error("failed to fetch mailboxes", "user_id", user.ID, "error", err)
 	}
 
-	s.render(w, r, user, mailboxes, email.MailboxID, "all", 0, templates.EmailHeaders(email, headers))
+	counts := s.getCounts(r.Context(), email.MailboxID, user.ID)
+	s.render(w, r, user, mailboxes, email.MailboxID, "all", counts, templates.EmailHeaders(email, headers))
 }
 
 func (s *Server) handleEmailPipeline(w http.ResponseWriter, r *http.Request) {
@@ -982,7 +1004,8 @@ func (s *Server) handleEmailPipeline(w http.ResponseWriter, r *http.Request) {
 		slog.Error("failed to fetch mailboxes", "user_id", user.ID, "error", err)
 	}
 
-	s.render(w, r, user, mailboxes, email.MailboxID, "all", 0, templates.EmailPipeline(email, steps))
+	counts := s.getCounts(r.Context(), email.MailboxID, user.ID)
+	s.render(w, r, user, mailboxes, email.MailboxID, "all", counts, templates.EmailPipeline(email, steps))
 }
 
 func securityHeaders(next http.Handler) http.Handler {

@@ -24,6 +24,7 @@ type WebDB interface {
 	GetAttachmentByIDForUser(ctx context.Context, attachmentID, userID uuid.UUID) (*models.EmailAttachment, error)
 	GetIngestionStepsByEmailID(ctx context.Context, emailID, userID uuid.UUID) ([]models.IngestionStep, error)
 
+	CountEmailsByMailboxID(ctx context.Context, mailboxID uuid.UUID, filter string) (int, error)
 	MarkEmailRead(ctx context.Context, emailID, userID uuid.UUID, read bool) error
 	MarkEmailStarred(ctx context.Context, emailID, userID uuid.UUID, starred bool) error
 	UpdateEmailStatus(ctx context.Context, emailID, userID uuid.UUID, status models.EmailStatus) error
@@ -113,7 +114,7 @@ func (db *DB) GetEmailsByMailboxID(ctx context.Context, mailboxID uuid.UUID, fil
 		SELECT
 			id, mailbox_id, thread_id, address_mapping_id, ingestion_id, message_id,
 			in_reply_to, "references", subject, from_address, to_address,
-			reply_to_address, storage_key, size, receive_datetime, is_read, is_star, direction, status, sending_address_id, user_id
+			reply_to_address, storage_key, size, receive_datetime, is_read, is_star, direction, status, sending_address_id, user_id, body_plain
 		FROM email
 		WHERE %s
 		ORDER BY receive_datetime DESC
@@ -124,13 +125,39 @@ func (db *DB) GetEmailsByMailboxID(ctx context.Context, mailboxID uuid.UUID, fil
 	return emails, err
 }
 
+func (db *DB) CountEmailsByMailboxID(ctx context.Context, mailboxID uuid.UUID, filter string) (int, error) {
+	var count int
+	whereClause := "mailbox_id = $1 AND status = 'INBOX' AND direction = 'INBOUND'"
+
+	switch filter {
+	case "unread":
+		whereClause = "mailbox_id = $1 AND is_read = FALSE AND status = 'INBOX' AND direction = 'INBOUND'"
+	case "read":
+		whereClause = "mailbox_id = $1 AND is_read = TRUE AND status = 'INBOX' AND direction = 'INBOUND'"
+	case "starred":
+		whereClause = "mailbox_id = $1 AND is_star = TRUE AND status != 'DELETED'"
+	case "quarantined":
+		whereClause = "mailbox_id = $1 AND status = 'QUARANTINED'"
+	case "deleted":
+		whereClause = "mailbox_id = $1 AND status = 'DELETED'"
+	case "sent":
+		whereClause = "mailbox_id = $1 AND direction = 'OUTBOUND' AND status != 'DELETED'"
+	case "all":
+		whereClause = "mailbox_id = $1 AND status = 'INBOX'"
+	}
+
+	query := fmt.Sprintf("SELECT COUNT(*) FROM email WHERE %s", whereClause)
+	err := db.GetContext(ctx, &count, query, mailboxID)
+	return count, err
+}
+
 func (db *DB) GetEmailByID(ctx context.Context, emailID uuid.UUID) (*models.Email, error) {
 	var email models.Email
 	err := db.GetContext(ctx, &email, `
 		SELECT
 			id, mailbox_id, thread_id, address_mapping_id, ingestion_id, message_id,
 			in_reply_to, "references", subject, from_address, to_address,
-			reply_to_address, storage_key, size, receive_datetime, is_read, is_star, direction, status, sending_address_id, user_id
+			reply_to_address, storage_key, size, receive_datetime, is_read, is_star, direction, status, sending_address_id, user_id, body_plain
 		FROM email
 		WHERE id = $1
 	`, emailID)
@@ -143,7 +170,7 @@ func (db *DB) GetEmailByIDForUser(ctx context.Context, emailID, userID uuid.UUID
 		SELECT
 			e.id, e.mailbox_id, e.thread_id, e.address_mapping_id, e.ingestion_id, e.message_id,
 			e.in_reply_to, e."references", e.subject, e.from_address, e.to_address,
-			e.reply_to_address, e.storage_key, e.size, e.receive_datetime, e.is_read, e.is_star, e.direction, e.status, e.sending_address_id, e.user_id
+			e.reply_to_address, e.storage_key, e.size, e.receive_datetime, e.is_read, e.is_star, e.direction, e.status, e.sending_address_id, e.user_id, e.body_plain
 		FROM email e
 		JOIN mailbox_user mu ON e.mailbox_id = mu.mailbox_id
 		WHERE e.id = $1 AND mu.user_id = $2 AND mu.is_active = TRUE
@@ -254,7 +281,7 @@ func (db *DB) SearchEmailsByMailboxID(ctx context.Context, mailboxID, userID uui
 			e.id, e.mailbox_id, e.thread_id, e.address_mapping_id, e.ingestion_id, e.message_id,
 			e.in_reply_to, e."references", e.subject, e.from_address, e.to_address,
 			e.reply_to_address, e.storage_key, e.size, e.receive_datetime, e.is_read, e.is_star,
-			e.direction, e.status, e.sending_address_id, e.user_id
+			e.direction, e.status, e.sending_address_id, e.user_id, e.body_plain
 		FROM email e
 		JOIN mailbox_user mu ON e.mailbox_id = mu.mailbox_id
 		WHERE e.mailbox_id = $1
