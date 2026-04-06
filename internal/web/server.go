@@ -812,6 +812,13 @@ func (s *Server) handleEmailStar(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	email.IsStar = starred
+
+	if r.URL.Query().Get("list") == "1" {
+		templates.EmailListStarButton(email.ID, starred).Render(r.Context(), w)
+		return
+	}
+
 	attachments, err := s.DB.GetAttachmentsByEmailID(r.Context(), emailID)
 	if err != nil {
 		slog.Error("failed to fetch attachments", "email_id", emailID, "error", err)
@@ -821,7 +828,6 @@ func (s *Server) handleEmailStar(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		slog.Error("failed to fetch body", "key", email.StorageKey, "error", err)
 	}
-	email.IsStar = starred
 
 	templates.EmailDetail(email, attachments, content, isHTML).Render(r.Context(), w)
 }

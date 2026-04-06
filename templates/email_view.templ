@@ -3,6 +3,7 @@ package templates
 import (
 	"fmt"
 	"github.com/colormechadd/maileroo/pkg/models"
+	"github.com/google/uuid"
 	"time"
 )
 
@@ -214,4 +215,26 @@ templ EmailDetail(email *models.Email, attachments []models.EmailAttachment, bod
 			</footer>
 		}
 	</div>
+}
+
+templ EmailListStarButton(emailID uuid.UUID, isStar bool) {
+	{{
+		starTitle := "Star"
+		if isStar {
+			starTitle = "Unstar"
+		}
+	}}
+	<button
+		class={ "transition-colors cursor-pointer", templ.KV("text-yellow-400", isStar), templ.KV("text-gray-300 hover:text-gray-400", !isStar) }
+		hx-post={ "/email/" + emailID.String() + "/star?list=1" }
+		hx-target="this"
+		hx-swap="outerHTML"
+		hx-push-url="false"
+		title={ starTitle }
+		onclick="event.stopPropagation()"
+	>
+		<svg class={ "h-5 w-5", templ.KV("fill-current", isStar) } fill="none" viewBox="0 0 24 24" stroke="currentColor">
+			<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+		</svg>
+	</button>
 }
