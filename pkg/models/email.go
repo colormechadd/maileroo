@@ -37,6 +37,7 @@ type Email struct {
 	ReplyToAddress   *string        `db:"reply_to_address" json:"reply_to_address"`
 	StorageKey       string         `db:"storage_key" json:"storage_key"`
 	Size             int64          `db:"size" json:"size"`
+	StoredSize       int64          `db:"stored_size" json:"stored_size"`
 	ReceiveDatetime  time.Time      `db:"receive_datetime" json:"receive_datetime"`
 	IsRead           bool           `db:"is_read" json:"is_read"`
 	IsStar           bool           `db:"is_star" json:"is_star"`

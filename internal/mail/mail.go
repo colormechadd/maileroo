@@ -143,6 +143,7 @@ func (s *Service) Persist(ctx context.Context, opts PersistOptions) (*models.Ema
 		ToAddress:        to,
 		StorageKey:       storageKey,
 		Size:             int64(len(opts.RawMessage)),
+		StoredSize:       int64(len(data)),
 		ReceiveDatetime:  time.Now(),
 		IsRead:           opts.IsOutbound, // Sent mail is read
 		IsStar:           false,

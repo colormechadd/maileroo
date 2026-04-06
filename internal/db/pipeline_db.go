@@ -64,12 +64,12 @@ func (db *DB) CreateEmail(ctx context.Context, email *models.Email) error {
 		INSERT INTO email (
 			id, mailbox_id, thread_id, address_mapping_id, ingestion_id, message_id,
 			in_reply_to, "references", subject, from_address, to_address,
-			reply_to_address, storage_key, size, receive_datetime, is_read, is_star,
+			reply_to_address, storage_key, size, stored_size, receive_datetime, is_read, is_star,
 			direction, status, sending_address_id, user_id, body_plain
 		) VALUES (
 			:id, :mailbox_id, :thread_id, :address_mapping_id, :ingestion_id, :message_id,
 			:in_reply_to, :references, :subject, :from_address, :to_address,
-			:reply_to_address, :storage_key, :size, :receive_datetime, :is_read, :is_star,
+			:reply_to_address, :storage_key, :size, :stored_size, :receive_datetime, :is_read, :is_star,
 			:direction, :status, :sending_address_id, :user_id, :body_plain
 		)
 	`, email)

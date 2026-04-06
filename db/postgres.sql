@@ -70,6 +70,29 @@ CREATE TABLE public.address_mapping (
 
 
 --
+-- Name: contact; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.contact (
+    id uuid DEFAULT uuidv7() NOT NULL,
+    user_id uuid NOT NULL,
+    first_name text DEFAULT ''::text NOT NULL,
+    last_name text DEFAULT ''::text NOT NULL,
+    email text NOT NULL,
+    phone text DEFAULT ''::text NOT NULL,
+    street text DEFAULT ''::text NOT NULL,
+    city text DEFAULT ''::text NOT NULL,
+    state text DEFAULT ''::text NOT NULL,
+    postal_code text DEFAULT ''::text NOT NULL,
+    country text DEFAULT ''::text NOT NULL,
+    notes text DEFAULT ''::text NOT NULL,
+    is_favorite boolean DEFAULT false NOT NULL,
+    create_datetime timestamp with time zone DEFAULT now() NOT NULL,
+    update_datetime timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+--
 -- Name: dkim_key; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -137,7 +160,8 @@ CREATE TABLE public.email (
     update_datetime timestamp with time zone DEFAULT CURRENT_TIMESTAMP,
     user_id uuid,
     body_plain text,
-    search_vector tsvector GENERATED ALWAYS AS (to_tsvector('english'::regconfig, ((((((COALESCE(subject, ''::text) || ' '::text) || COALESCE(from_address, ''::text)) || ' '::text) || COALESCE(to_address, ''::text)) || ' '::text) || COALESCE(body_plain, ''::text)))) STORED
+    search_vector tsvector GENERATED ALWAYS AS (to_tsvector('english'::regconfig, ((((((COALESCE(subject, ''::text) || ' '::text) || COALESCE(from_address, ''::text)) || ' '::text) || COALESCE(to_address, ''::text)) || ' '::text) || COALESCE(body_plain, ''::text)))) STORED,
+    stored_size bigint DEFAULT 0 NOT NULL
 );
 
 
@@ -352,6 +376,22 @@ ALTER TABLE ONLY public.address_mapping
 
 
 --
+-- Name: contact contact_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.contact
+    ADD CONSTRAINT contact_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: contact contact_user_id_email_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.contact
+    ADD CONSTRAINT contact_user_id_email_key UNIQUE (user_id, email);
+
+
+--
 -- Name: dkim_key dkim_key_domain_selector_key; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -532,6 +572,27 @@ ALTER TABLE ONLY public.webmail_session
 --
 
 CREATE INDEX idx_address_mapping_pattern ON public.address_mapping USING btree (address_pattern);
+
+
+--
+-- Name: idx_contact_user_email; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_contact_user_email ON public.contact USING btree (user_id, email);
+
+
+--
+-- Name: idx_contact_user_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_contact_user_id ON public.contact USING btree (user_id);
+
+
+--
+-- Name: idx_contact_user_name; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_contact_user_name ON public.contact USING btree (user_id, last_name, first_name);
 
 
 --
@@ -718,6 +779,14 @@ ALTER TABLE ONLY public.address_mapping
 
 
 --
+-- Name: contact contact_user_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.contact
+    ADD CONSTRAINT contact_user_id_fkey FOREIGN KEY (user_id) REFERENCES public."user"(id) ON DELETE CASCADE;
+
+
+--
 -- Name: draft draft_mailbox_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -888,4 +957,6 @@ INSERT INTO public.schema_migrations (version) VALUES
     ('20260330000001'),
     ('20260330000002'),
     ('20260331000000'),
-    ('20260331000001');
+    ('20260331000001'),
+    ('20260401000000'),
+    ('20260405000000');
