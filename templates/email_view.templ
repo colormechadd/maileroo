@@ -7,7 +7,7 @@ import (
 	"time"
 )
 
-templ EmailDetail(email *models.Email, attachments []models.EmailAttachment, body string, isHTML bool) {
+templ EmailDetail(email *models.Email, attachments []models.EmailAttachment, body string, isHTML bool, unsubInfo *models.UnsubscribeInfo) {
 	{{
 		starTitle := "Star"
 		if email.IsStar {
@@ -168,10 +168,38 @@ templ EmailDetail(email *models.Email, attachments []models.EmailAttachment, bod
 					<p class="text-gray-500 text-sm font-medium" data-local-time={ email.ReceiveDatetime.Format(time.RFC3339) } data-format="full">
 						{ email.ReceiveDatetime.Format("Jan 02, 2006, 15:04") }
 					</p>
+					<div class="mt-2 flex items-center justify-end gap-2">
+						if unsubInfo != nil {
+							if unsubInfo.OneClick && unsubInfo.URL != "" {
+								<button
+									class="px-3 py-1 text-xs font-medium text-purple-700 border border-purple-300 rounded-lg hover:bg-purple-50 transition-colors cursor-pointer"
+									hx-post={ "/email/" + email.ID.String() + "/unsubscribe" }
+									hx-swap="none"
+								>Unsubscribe</button>
+							} else if unsubInfo.URL != "" {
+								<a
+									href={ templ.URL(unsubInfo.URL) }
+									target="_blank"
+									rel="noopener noreferrer"
+									class="px-3 py-1 text-xs font-medium text-purple-700 border border-purple-300 rounded-lg hover:bg-purple-50 transition-colors"
+								>Unsubscribe</a>
+							} else if unsubInfo.Mailto != "" {
+								<a
+									href={ templ.URL(unsubInfo.Mailto) }
+									class="px-3 py-1 text-xs font-medium text-purple-700 border border-purple-300 rounded-lg hover:bg-purple-50 transition-colors"
+								>Unsubscribe</a>
+							}
+						}
+						<button
+							class="px-3 py-1 text-xs font-medium text-red-600 border border-red-300 rounded-lg hover:bg-red-50 transition-colors cursor-pointer"
+							hx-post={ "/email/" + email.ID.String() + "/block" }
+							hx-swap="none"
+							hx-confirm={ "Block all future emails from " + email.FromAddress + "?" }
+						>Block</button>
+					</div>
 				</div>
 			</div>
 		</header>
-
 		<div class="flex-1 overflow-y-auto p-10 max-w-4xl mx-auto w-full">
 			if isHTML {
 				<div class="email-body-html">

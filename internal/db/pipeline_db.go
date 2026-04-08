@@ -44,6 +44,15 @@ func (db *DB) UpdateIngestionStatus(ctx context.Context, id uuid.UUID, status st
 	return err
 }
 
+func (db *DB) CreateBlockRule(ctx context.Context, mailboxID uuid.UUID, addressPattern string) error {
+	_, err := db.ExecContext(ctx, `
+		INSERT INTO mailbox_block_rule (mailbox_id, address_pattern)
+		VALUES ($1, $2)
+		ON CONFLICT DO NOTHING
+	`, mailboxID, addressPattern)
+	return err
+}
+
 func (db *DB) IsBlockedByMailboxRules(ctx context.Context, mailboxID uuid.UUID, fromAddress string) (bool, error) {
 	var count int
 	err := db.GetContext(ctx, &count, `

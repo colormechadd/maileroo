@@ -57,6 +57,12 @@ type EmailAttachment struct {
 	StorageKey  string    `db:"storage_key" json:"storage_key"`
 }
 
+type UnsubscribeInfo struct {
+	URL      string // https/http unsubscribe URL
+	Mailto   string // mailto unsubscribe address
+	OneClick bool   // true when List-Unsubscribe-Post: List-Unsubscribe=One-Click
+}
+
 type Draft struct {
 	ID               uuid.UUID  `db:"id" json:"id"`
 	MailboxID        uuid.UUID  `db:"mailbox_id" json:"mailbox_id"`

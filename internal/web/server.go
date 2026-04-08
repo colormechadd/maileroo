@@ -14,6 +14,7 @@ import (
 	"mime"
 	"net"
 	"net/http"
+	"regexp"
 	"strings"
 	"sync"
 	"time"
@@ -141,6 +142,8 @@ func (s *Server) Routes() http.Handler {
 			r.Post("/email/{emailID}/release", s.handleEmailRelease)
 			r.Post("/email/{emailID}/mark-spam", s.handleEmailMarkSpam)
 			r.Post("/email/{emailID}/mark-ham", s.handleEmailMarkHam)
+			r.Post("/email/{emailID}/unsubscribe", s.handleEmailUnsubscribe)
+			r.Post("/email/{emailID}/block", s.handleEmailBlockSender)
 		})
 		r.Get("/attachment/{attachmentID}", s.handleAttachmentDownload)
 
@@ -779,6 +782,11 @@ func (s *Server) handleEmailView(w http.ResponseWriter, r *http.Request) {
 		content = "Failed to load content"
 	}
 
+	unsubInfo, err := s.Mail.FetchUnsubscribeInfo(r.Context(), email)
+	if err != nil {
+		slog.Error("failed to fetch unsubscribe info", "key", email.StorageKey, "error", err)
+	}
+
 	mailboxes, err := s.DB.GetMailboxesByUserID(r.Context(), user.ID)
 	if err != nil {
 		slog.Error("failed to fetch mailboxes", "user_id", user.ID, "error", err)
@@ -787,7 +795,7 @@ func (s *Server) handleEmailView(w http.ResponseWriter, r *http.Request) {
 	}
 
 	counts := s.getCounts(r.Context(), email.MailboxID, user.ID)
-	s.render(w, r, user, mailboxes, email.MailboxID, "all", counts, templates.EmailDetail(email, attachments, content, isHTML))
+	s.render(w, r, user, mailboxes, email.MailboxID, "all", counts, templates.EmailDetail(email, attachments, content, isHTML, unsubInfo))
 }
 
 func (s *Server) handleEmailStar(w http.ResponseWriter, r *http.Request) {
@@ -829,7 +837,12 @@ func (s *Server) handleEmailStar(w http.ResponseWriter, r *http.Request) {
 		slog.Error("failed to fetch body", "key", email.StorageKey, "error", err)
 	}
 
-	templates.EmailDetail(email, attachments, content, isHTML).Render(r.Context(), w)
+	unsubInfo, err := s.Mail.FetchUnsubscribeInfo(r.Context(), email)
+	if err != nil {
+		slog.Error("failed to fetch unsubscribe info", "key", email.StorageKey, "error", err)
+	}
+
+	templates.EmailDetail(email, attachments, content, isHTML, unsubInfo).Render(r.Context(), w)
 }
 
 func (s *Server) handleEmailDelete(w http.ResponseWriter, r *http.Request) {
@@ -899,6 +912,74 @@ func (s *Server) handleEmailMarkSpam(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) handleEmailMarkHam(w http.ResponseWriter, r *http.Request) {
 	s.handleEmailLearn(w, r, false, models.StatusInbox)
+}
+
+func (s *Server) handleEmailUnsubscribe(w http.ResponseWriter, r *http.Request) {
+	user := r.Context().Value("user").(*models.User)
+	emailID, err := uuid.Parse(chi.URLParam(r, "emailID"))
+	if err != nil {
+		http.Error(w, "Invalid ID", http.StatusBadRequest)
+		return
+	}
+
+	email, err := s.DB.GetEmailByIDForUser(r.Context(), emailID, user.ID)
+	if err != nil {
+		http.Error(w, "Not found", http.StatusNotFound)
+		return
+	}
+
+	info, err := s.Mail.FetchUnsubscribeInfo(r.Context(), email)
+	if err != nil || info == nil || info.URL == "" {
+		http.Error(w, "No unsubscribe URL available", http.StatusBadRequest)
+		return
+	}
+
+	req, err := http.NewRequestWithContext(r.Context(), http.MethodPost, info.URL, strings.NewReader("List-Unsubscribe=One-Click"))
+	if err != nil {
+		slog.Error("failed to build unsubscribe request", "url", info.URL, "error", err)
+		http.Error(w, "Failed to unsubscribe", http.StatusInternalServerError)
+		return
+	}
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		slog.Error("unsubscribe request failed", "url", info.URL, "error", err)
+		http.Error(w, "Failed to unsubscribe", http.StatusInternalServerError)
+		return
+	}
+	resp.Body.Close()
+
+	w.Header().Set("HX-Reswap", "none")
+	w.Header().Set("HX-Trigger", `{"showToast":"Unsubscribed successfully"}`)
+	w.WriteHeader(http.StatusOK)
+}
+
+func (s *Server) handleEmailBlockSender(w http.ResponseWriter, r *http.Request) {
+	user := r.Context().Value("user").(*models.User)
+	emailID, err := uuid.Parse(chi.URLParam(r, "emailID"))
+	if err != nil {
+		http.Error(w, "Invalid ID", http.StatusBadRequest)
+		return
+	}
+
+	email, err := s.DB.GetEmailByIDForUser(r.Context(), emailID, user.ID)
+	if err != nil {
+		http.Error(w, "Not found", http.StatusNotFound)
+		return
+	}
+
+	// Escape the sender address for use as a literal regex pattern
+	pattern := "^" + regexp.QuoteMeta(email.FromAddress) + "$"
+	if err := s.DB.CreateBlockRule(r.Context(), email.MailboxID, pattern); err != nil {
+		slog.Error("failed to create block rule", "mailbox_id", email.MailboxID, "error", err)
+		http.Error(w, "Error", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("HX-Reswap", "none")
+	w.Header().Set("HX-Trigger", `{"showToast":"Sender blocked"}`)
+	w.WriteHeader(http.StatusOK)
 }
 
 func (s *Server) handleEmailLearn(w http.ResponseWriter, r *http.Request, spam bool, targetStatus models.EmailStatus) {

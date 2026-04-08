@@ -393,6 +393,56 @@ func (s *Service) FetchHeaders(ctx context.Context, email *models.Email) (string
 	return sb.String(), nil
 }
 
+func (s *Service) FetchUnsubscribeInfo(ctx context.Context, email *models.Email) (*models.UnsubscribeInfo, error) {
+	rc, err := s.storage.Get(ctx, email.StorageKey)
+	if err != nil {
+		return nil, err
+	}
+	defer rc.Close()
+
+	bodyReader, err := s.DecompressReader(rc, email.StorageKey)
+	if err != nil {
+		return nil, err
+	}
+	if closer, ok := bodyReader.(io.Closer); ok {
+		defer closer.Close()
+	}
+
+	mr, err := gomail.CreateReader(bodyReader)
+	if err != nil {
+		return nil, err
+	}
+	defer mr.Close()
+
+	listUnsub := mr.Header.Get("List-Unsubscribe")
+	if listUnsub == "" {
+		return nil, nil
+	}
+
+	info := &models.UnsubscribeInfo{
+		OneClick: strings.Contains(mr.Header.Get("List-Unsubscribe-Post"), "List-Unsubscribe=One-Click"),
+	}
+
+	for _, part := range strings.Split(listUnsub, ",") {
+		part = strings.TrimSpace(part)
+		if strings.HasPrefix(part, "<") && strings.HasSuffix(part, ">") {
+			u := part[1 : len(part)-1]
+			switch {
+			case (strings.HasPrefix(u, "https://") || strings.HasPrefix(u, "http://")) && info.URL == "":
+				info.URL = u
+			case strings.HasPrefix(u, "mailto:") && info.Mailto == "":
+				info.Mailto = u
+			}
+		}
+	}
+
+	if info.URL == "" && info.Mailto == "" {
+		return nil, nil
+	}
+
+	return info, nil
+}
+
 func (s *Service) DecompressReader(r io.Reader, key string) (io.Reader, error) {
 	if strings.HasSuffix(key, ".zst") {
 		zr, err := zstd.NewReader(r)

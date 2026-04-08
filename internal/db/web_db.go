@@ -51,6 +51,8 @@ type WebDB interface {
 	DeleteContact(ctx context.Context, contactID, userID uuid.UUID) error
 	ToggleContactFavorite(ctx context.Context, contactID, userID uuid.UUID) error
 	UpsertContactFromEmail(ctx context.Context, userID uuid.UUID, email, firstName, lastName string) error
+
+	CreateBlockRule(ctx context.Context, mailboxID uuid.UUID, addressPattern string) error
 }
 
 func (db *DB) CreateWebmailSession(ctx context.Context, userID uuid.UUID, token string, remoteIP, userAgent string, expires time.Time) error {
