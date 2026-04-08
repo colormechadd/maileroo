@@ -32,15 +32,48 @@ type Service struct {
 	policy      *bluemonday.Policy
 }
 
-func NewService(repo Repository, storage storage.Storage, compression string) *Service {
-	p := bluemonday.UGCPolicy()
-	p.AllowStyling()
+func newEmailPolicy() *bluemonday.Policy {
+	p := bluemonday.NewPolicy()
 
+	// Structural and text elements
+	p.AllowElements(
+		"div", "span", "p", "br", "hr", "center",
+		"h1", "h2", "h3", "h4", "h5", "h6",
+		"ul", "ol", "li", "dl", "dt", "dd",
+		"blockquote", "pre", "code", "tt",
+		"b", "i", "u", "s", "em", "strong", "small", "big", "sub", "sup",
+		"font", "section", "article", "header", "footer", "figure", "figcaption",
+	)
+
+	// Table layout (extremely common in email HTML)
+	p.AllowElements("table", "thead", "tbody", "tfoot", "tr", "th", "td", "caption", "col", "colgroup")
+	tableAttrs := []string{"width", "height", "cellpadding", "cellspacing", "border", "align", "valign", "bgcolor", "colspan", "rowspan", "nowrap", "scope"}
+	p.AllowAttrs(tableAttrs...).OnElements("table", "thead", "tbody", "tfoot", "tr", "th", "td", "col", "colgroup")
+
+	// Links
+	p.AllowAttrs("href", "title", "target", "rel", "name").OnElements("a")
+	p.AllowURLSchemes("http", "https", "mailto", "data", "cid")
+
+	// Images
+	p.AllowAttrs("src", "alt", "title", "width", "height", "border", "align", "hspace", "vspace").OnElements("img")
+
+	// Font element
+	p.AllowAttrs("color", "face", "size").OnElements("font")
+
+	// Global attributes allowed on everything
+	p.AllowAttrs("style", "class", "id", "dir", "lang", "title", "role",
+		"align", "valign", "bgcolor", "color", "width", "height",
+		"aria-label", "aria-hidden").Globally()
+
+	return p
+}
+
+func NewService(repo Repository, storage storage.Storage, compression string) *Service {
 	return &Service{
 		repo:        repo,
 		storage:     storage,
 		compression: compression,
-		policy:      p,
+		policy:      newEmailPolicy(),
 	}
 }
 
@@ -88,13 +121,13 @@ func (s *Service) Persist(ctx context.Context, opts PersistOptions) (*models.Ema
 	fromAddrs, _ := mr.Header.AddressList("From")
 	from := ""
 	if len(fromAddrs) > 0 {
-		from = fromAddrs[0].Address
+		from = fromAddrs[0].String()
 	}
 
 	toAddrs, _ := mr.Header.AddressList("To")
 	to := ""
 	if len(toAddrs) > 0 {
-		to = toAddrs[0].Address
+		to = toAddrs[0].String()
 	}
 
 	inReplyTo, _ := mr.Header.Text("In-Reply-To")

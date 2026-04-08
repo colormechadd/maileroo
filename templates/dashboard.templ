@@ -52,18 +52,26 @@ func getInboxID(mbs []models.Mailbox) uuid.UUID {
 	return uuid.Nil
 }
 
-func getInitials(name string) string {
-	if name == "" {
+func getInitials(addr string) string {
+	if addr == "" {
 		return "?"
 	}
-	parts := strings.Fields(name)
+	display := addr
+	if idx := strings.Index(addr, "<"); idx > 0 {
+		display = strings.TrimSpace(addr[:idx])
+	}
+	display = strings.Trim(display, `"'`)
+	if display == "" {
+		display = addr
+	}
+	parts := strings.Fields(display)
 	if len(parts) > 1 {
 		return strings.ToUpper(parts[0][:1] + parts[1][:1])
 	}
-	if len(name) > 1 {
-		return strings.ToUpper(name[:1])
+	if len(display) > 1 {
+		return strings.ToUpper(display[:1])
 	}
-	return strings.ToUpper(name)
+	return strings.ToUpper(display)
 }
 
 func getAvatarColor(name string) string {
