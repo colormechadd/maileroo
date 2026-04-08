@@ -177,6 +177,12 @@ templ EmailDetail(email *models.Email, attachments []models.EmailAttachment, bod
 				<div class="email-body-html">
 					@templ.Raw(body)
 				</div>
+				<script>
+					document.querySelectorAll('.email-body-html a').forEach(function(a) {
+						a.setAttribute('target', '_blank');
+						a.setAttribute('rel', 'noopener noreferrer');
+					});
+				</script>
 			} else {
 				<div class="whitespace-pre-wrap font-sans text-gray-800 leading-relaxed text-base">
 					{ body }
