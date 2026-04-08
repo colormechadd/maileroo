@@ -52,6 +52,19 @@ func getInboxID(mbs []models.Mailbox) uuid.UUID {
 	return uuid.Nil
 }
 
+func parseFromAddress(addr string) (name, email string) {
+	start := strings.Index(addr, "<")
+	end := strings.Index(addr, ">")
+	if start > 0 && end > start {
+		name = strings.TrimSpace(addr[:start])
+		name = strings.Trim(name, `"'`)
+		email = strings.TrimSpace(addr[start+1 : end])
+	} else {
+		email = strings.TrimSpace(addr)
+	}
+	return
+}
+
 func getInitials(addr string) string {
 	if addr == "" {
 		return "?"
@@ -340,27 +353,28 @@ templ MailboxContent(mailboxID uuid.UUID, filter string, emails []models.Email, 
 
 						<div class="flex-1 min-w-0">
 							<div class="flex items-center justify-between mb-0.5">
-								<p class={ "text-sm truncate", templ.KV("font-bold text-gray-900", !email.IsRead), templ.KV("text-gray-600", email.IsRead) }>
+								<p class="text-sm truncate">
 									if filter == "sent" {
 										To: { email.ToAddress }
 									} else {
-										{ email.FromAddress }
+										{{
+											fromName, fromEmail := parseFromAddress(email.FromAddress)
+										}}
+										if fromName != "" {
+											<span class={ templ.KV("font-bold text-gray-900", !email.IsRead), templ.KV("text-gray-600", email.IsRead) }>{ fromName }</span>
+											<span class="text-gray-400 font-normal ml-1">{ fromEmail }</span>
+										} else {
+											<span class={ templ.KV("font-bold text-gray-900", !email.IsRead), templ.KV("text-gray-600", email.IsRead) }>{ fromEmail }</span>
+										}
 									}
 								</p>
 								<p class={ "text-xs font-bold whitespace-nowrap ml-4", templ.KV("text-purple-600", !email.IsRead), templ.KV("text-gray-400", email.IsRead) } data-local-time={ email.ReceiveDatetime.Format("2006-01-02T15:04:05Z07:00") } data-format="list">
 									{ email.ReceiveDatetime.Format("Jan 02, 15:04") }
 								</p>
 							</div>
-							<div class="flex items-center gap-2">
-								<p class={ "text-sm truncate", templ.KV("font-bold text-gray-800", !email.IsRead), templ.KV("text-gray-500", email.IsRead) }>
-									{ email.Subject }
-								</p>
-								if email.BodyPlain != nil && *email.BodyPlain != "" {
-									<span class="text-sm text-gray-400 truncate font-normal">
-										- { *email.BodyPlain }
-									</span>
-								}
-							</div>
+							<p class={ "text-sm truncate", templ.KV("text-gray-900", !email.IsRead), templ.KV("text-gray-400", email.IsRead) }>
+								{ email.Subject }
+							</p>
 						</div>
 					</li>
 				}
