@@ -5,6 +5,10 @@
   display: inline !important;
 }
 
+.email-body-html a {
+  text-decoration: underline;
+}
+
 @utility scrollbar-hide {
   scrollbar-width: none;
   -ms-overflow-style: none;

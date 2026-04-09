@@ -1,12 +1,20 @@
 package templates
 
 import (
+	"encoding/base64"
 	"fmt"
 	"github.com/colormechadd/maileroo/pkg/models"
 	"github.com/google/uuid"
+	"net/url"
 	"sort"
 	"strings"
+	"time"
 )
+
+func encodeCursor(t time.Time, id uuid.UUID) string {
+	raw := t.UTC().Format(time.RFC3339Nano) + "|" + id.String()
+	return base64.URLEncoding.EncodeToString([]byte(raw))
+}
 
 func sortMailboxes(mbs []models.Mailbox) []models.Mailbox {
 	sorted := make([]models.Mailbox, len(mbs))
@@ -262,7 +270,67 @@ templ Dashboard(user *models.User, mailboxes []models.Mailbox, currentMailboxID 
 	}
 }
 
-templ MailboxContent(mailboxID uuid.UUID, filter string, emails []models.Email, searchQuery string) {
+templ EmailListRows(emails []models.Email, filter string, loadMoreURL string, hasMore bool) {
+	for _, email := range emails {
+		<li
+			class={ "hover:bg-gray-50 transition-colors cursor-pointer group relative flex items-center px-6 py-3 gap-4", templ.KV("bg-purple-50/30", !email.IsRead) }
+			data-email-id={ email.ID.String() }
+			hx-get={ "/email/" + email.ID.String() }
+			hx-target="#main-content"
+			hx-push-url="true"
+			hx-swap="innerHTML"
+		>
+			<div class="flex items-center gap-4 flex-shrink-0" onclick="event.stopPropagation()">
+				<input type="checkbox"
+					class="h-4 w-4 rounded border-gray-300 text-purple-600 focus:ring-purple-500 cursor-pointer"
+					:checked="isSelected($el.closest('[data-email-id]').dataset.emailId)"
+					@change="toggle($el.closest('[data-email-id]').dataset.emailId, $event.target.checked)"
+				/>
+				@EmailListStarButton(email.ID, email.IsStar)
+			</div>
+
+			<div class={ "h-10 w-10 rounded-full flex items-center justify-center font-bold text-sm flex-shrink-0", getAvatarColor(email.FromAddress) }>
+				{ getInitials(email.FromAddress) }
+			</div>
+
+			<div class="flex-1 min-w-0">
+				<div class="flex items-center justify-between mb-0.5">
+					<p class="text-sm truncate">
+						if filter == "sent" {
+							To: { email.ToAddress }
+						} else {
+							{{
+								fromName, fromEmail := parseFromAddress(email.FromAddress)
+							}}
+							if fromName != "" {
+								<span class={ templ.KV("font-bold text-gray-900", !email.IsRead), templ.KV("text-gray-600", email.IsRead) }>{ fromName }</span>
+								<span class="text-gray-400 font-normal ml-1">{ fromEmail }</span>
+							} else {
+								<span class={ templ.KV("font-bold text-gray-900", !email.IsRead), templ.KV("text-gray-600", email.IsRead) }>{ fromEmail }</span>
+							}
+						}
+					</p>
+					<p class={ "text-xs font-bold whitespace-nowrap ml-4", templ.KV("text-purple-600", !email.IsRead), templ.KV("text-gray-400", email.IsRead) } data-local-time={ email.ReceiveDatetime.Format("2006-01-02T15:04:05Z07:00") } data-format="list">
+						{ email.ReceiveDatetime.Format("Jan 02, 15:04") }
+					</p>
+				</div>
+				<p class={ "text-sm truncate", templ.KV("text-gray-900", !email.IsRead), templ.KV("text-gray-400", email.IsRead) }>
+					{ email.Subject }
+				</p>
+			</div>
+		</li>
+	}
+	if hasMore {
+		<li
+			hx-get={ loadMoreURL }
+			hx-trigger="intersect once"
+			hx-swap="outerHTML"
+			class="h-px"
+		></li>
+	}
+}
+
+templ MailboxContent(mailboxID uuid.UUID, filter string, emails []models.Email, searchQuery string, hasMore bool) {
 	<!-- Header -->
 	<header class="h-16 border-b border-gray-100 flex items-center justify-between px-6 bg-white sticky top-0 z-10">
 		<div class="flex items-center gap-4">
@@ -328,56 +396,18 @@ templ MailboxContent(mailboxID uuid.UUID, filter string, emails []models.Email, 
 	<!-- Email List -->
 	<div class="flex-1 overflow-y-auto">
 		if len(emails) > 0 {
-			<ul class="divide-y divide-gray-50">
-				for _, email := range emails {
-					<li
-						class={ "hover:bg-gray-50 transition-colors cursor-pointer group relative flex items-center px-6 py-3 gap-4", templ.KV("bg-purple-50/30", !email.IsRead) }
-						data-email-id={ email.ID.String() }
-						hx-get={ "/email/" + email.ID.String() }
-						hx-target="#main-content"
-						hx-push-url="true"
-						hx-swap="innerHTML"
-					>
-						<div class="flex items-center gap-4 flex-shrink-0" onclick="event.stopPropagation()">
-							<input type="checkbox"
-								class="h-4 w-4 rounded border-gray-300 text-purple-600 focus:ring-purple-500 cursor-pointer"
-								:checked="isSelected($el.closest('[data-email-id]').dataset.emailId)"
-								@change="toggle($el.closest('[data-email-id]').dataset.emailId, $event.target.checked)"
-							/>
-							@EmailListStarButton(email.ID, email.IsStar)
-						</div>
-
-						<div class={ "h-10 w-10 rounded-full flex items-center justify-center font-bold text-sm flex-shrink-0", getAvatarColor(email.FromAddress) }>
-							{ getInitials(email.FromAddress) }
-						</div>
-
-						<div class="flex-1 min-w-0">
-							<div class="flex items-center justify-between mb-0.5">
-								<p class="text-sm truncate">
-									if filter == "sent" {
-										To: { email.ToAddress }
-									} else {
-										{{
-											fromName, fromEmail := parseFromAddress(email.FromAddress)
-										}}
-										if fromName != "" {
-											<span class={ templ.KV("font-bold text-gray-900", !email.IsRead), templ.KV("text-gray-600", email.IsRead) }>{ fromName }</span>
-											<span class="text-gray-400 font-normal ml-1">{ fromEmail }</span>
-										} else {
-											<span class={ templ.KV("font-bold text-gray-900", !email.IsRead), templ.KV("text-gray-600", email.IsRead) }>{ fromEmail }</span>
-										}
-									}
-								</p>
-								<p class={ "text-xs font-bold whitespace-nowrap ml-4", templ.KV("text-purple-600", !email.IsRead), templ.KV("text-gray-400", email.IsRead) } data-local-time={ email.ReceiveDatetime.Format("2006-01-02T15:04:05Z07:00") } data-format="list">
-									{ email.ReceiveDatetime.Format("Jan 02, 15:04") }
-								</p>
-							</div>
-							<p class={ "text-sm truncate", templ.KV("text-gray-900", !email.IsRead), templ.KV("text-gray-400", email.IsRead) }>
-								{ email.Subject }
-							</p>
-						</div>
-					</li>
+			{{
+				last := emails[len(emails)-1]
+				cursor := encodeCursor(last.ReceiveDatetime, last.ID)
+				var loadMoreURL string
+				if searchQuery != "" {
+					loadMoreURL = "/mailbox/" + mailboxID.String() + "/search/more?q=" + url.QueryEscape(searchQuery) + "&cursor=" + cursor
+				} else {
+					loadMoreURL = "/mailbox/" + mailboxID.String() + "/more?filter=" + filter + "&cursor=" + cursor
 				}
+			}}
+			<ul class="divide-y divide-gray-50">
+				@EmailListRows(emails, filter, loadMoreURL, hasMore)
 			</ul>
 		} else if mailboxID != uuid.Nil {
 			<div class="flex flex-col items-center justify-center h-full text-gray-300 space-y-4">
@@ -435,9 +465,9 @@ templ MailboxContent(mailboxID uuid.UUID, filter string, emails []models.Email, 
 	</div>
 }
 
-templ SearchContent(mailboxID uuid.UUID, query string, emails []models.Email) {
+templ SearchContent(mailboxID uuid.UUID, query string, emails []models.Email, hasMore bool) {
 	<!-- Search content uses the same structure as MailboxContent -->
-	@MailboxContent(mailboxID, "search", emails, query)
+	@MailboxContent(mailboxID, "search", emails, query, hasMore)
 }
 
 templ DraftsContent(mailboxID uuid.UUID, drafts []models.Draft) {

@@ -16,8 +16,8 @@ type WebDB interface {
 	ExpireWebmailSession(ctx context.Context, token string) error
 	GetUserByID(ctx context.Context, id uuid.UUID) (*models.User, error)
 	GetMailboxesByUserID(ctx context.Context, userID uuid.UUID) ([]models.Mailbox, error)
-	GetEmailsByMailboxID(ctx context.Context, mailboxID uuid.UUID, filter string, limit, offset int) ([]models.Email, error)
-	SearchEmailsByMailboxID(ctx context.Context, mailboxID, userID uuid.UUID, query string, limit, offset int) ([]models.Email, error)
+	GetEmailsByMailboxID(ctx context.Context, mailboxID uuid.UUID, filter string, limit int, cursorTime *time.Time, cursorID *uuid.UUID) ([]models.Email, error)
+	SearchEmailsByMailboxID(ctx context.Context, mailboxID, userID uuid.UUID, query string, limit int, cursorTime *time.Time, cursorID *uuid.UUID) ([]models.Email, error)
 	GetEmailByID(ctx context.Context, emailID uuid.UUID) (*models.Email, error)
 	GetEmailByIDForUser(ctx context.Context, emailID, userID uuid.UUID) (*models.Email, error)
 	GetAttachmentsByEmailID(ctx context.Context, emailID uuid.UUID) ([]models.EmailAttachment, error)
@@ -91,7 +91,7 @@ func (db *DB) GetMailboxesByUserID(ctx context.Context, userID uuid.UUID) ([]mod
 	return mailboxes, err
 }
 
-func (db *DB) GetEmailsByMailboxID(ctx context.Context, mailboxID uuid.UUID, filter string, limit, offset int) ([]models.Email, error) {
+func (db *DB) GetEmailsByMailboxID(ctx context.Context, mailboxID uuid.UUID, filter string, limit int, cursorTime *time.Time, cursorID *uuid.UUID) ([]models.Email, error) {
 	var emails []models.Email
 	whereClause := "mailbox_id = $1 AND status = 'INBOX' AND direction = 'INBOUND'"
 
@@ -112,18 +112,36 @@ func (db *DB) GetEmailsByMailboxID(ctx context.Context, mailboxID uuid.UUID, fil
 		whereClause = "mailbox_id = $1 AND status = 'INBOX'"
 	}
 
-	query := fmt.Sprintf(`
-		SELECT
-			id, mailbox_id, thread_id, address_mapping_id, ingestion_id, message_id,
-			in_reply_to, "references", subject, from_address, to_address,
-			reply_to_address, storage_key, size, receive_datetime, is_read, is_star, direction, status, sending_address_id, user_id, body_plain
-		FROM email
-		WHERE %s
-		ORDER BY receive_datetime DESC
-		LIMIT $2 OFFSET $3
-	`, whereClause)
+	var query string
+	var args []any
+	if cursorTime != nil && cursorID != nil {
+		query = fmt.Sprintf(`
+			SELECT
+				id, mailbox_id, thread_id, address_mapping_id, ingestion_id, message_id,
+				in_reply_to, "references", subject, from_address, to_address,
+				reply_to_address, storage_key, size, receive_datetime, is_read, is_star, direction, status, sending_address_id, user_id, body_plain
+			FROM email
+			WHERE %s
+			  AND (receive_datetime, id) < ($2, $3)
+			ORDER BY receive_datetime DESC, id DESC
+			LIMIT $4
+		`, whereClause)
+		args = []any{mailboxID, cursorTime, cursorID, limit}
+	} else {
+		query = fmt.Sprintf(`
+			SELECT
+				id, mailbox_id, thread_id, address_mapping_id, ingestion_id, message_id,
+				in_reply_to, "references", subject, from_address, to_address,
+				reply_to_address, storage_key, size, receive_datetime, is_read, is_star, direction, status, sending_address_id, user_id, body_plain
+			FROM email
+			WHERE %s
+			ORDER BY receive_datetime DESC, id DESC
+			LIMIT $2
+		`, whereClause)
+		args = []any{mailboxID, limit}
+	}
 
-	err := db.SelectContext(ctx, &emails, query, mailboxID, limit, offset)
+	err := db.SelectContext(ctx, &emails, query, args...)
 	return emails, err
 }
 
@@ -276,23 +294,44 @@ func (db *DB) UpdateSendingAddressDisplayName(ctx context.Context, id, userID uu
 	return err
 }
 
-func (db *DB) SearchEmailsByMailboxID(ctx context.Context, mailboxID, userID uuid.UUID, query string, limit, offset int) ([]models.Email, error) {
+func (db *DB) SearchEmailsByMailboxID(ctx context.Context, mailboxID, userID uuid.UUID, query string, limit int, cursorTime *time.Time, cursorID *uuid.UUID) ([]models.Email, error) {
 	var emails []models.Email
-	err := db.SelectContext(ctx, &emails, `
-		SELECT
-			e.id, e.mailbox_id, e.thread_id, e.address_mapping_id, e.ingestion_id, e.message_id,
-			e.in_reply_to, e."references", e.subject, e.from_address, e.to_address,
-			e.reply_to_address, e.storage_key, e.size, e.receive_datetime, e.is_read, e.is_star,
-			e.direction, e.status, e.sending_address_id, e.user_id, e.body_plain
-		FROM email e
-		JOIN mailbox_user mu ON e.mailbox_id = mu.mailbox_id
-		WHERE e.mailbox_id = $1
-		  AND mu.user_id = $2
-		  AND mu.is_active = TRUE
-		  AND e.status != 'DELETED'
-		  AND e.search_vector @@ plainto_tsquery('english', $3)
-		ORDER BY ts_rank(e.search_vector, plainto_tsquery('english', $3)) DESC, e.receive_datetime DESC
-		LIMIT $4 OFFSET $5
-	`, mailboxID, userID, query, limit, offset)
+	var err error
+	if cursorTime != nil && cursorID != nil {
+		err = db.SelectContext(ctx, &emails, `
+			SELECT
+				e.id, e.mailbox_id, e.thread_id, e.address_mapping_id, e.ingestion_id, e.message_id,
+				e.in_reply_to, e."references", e.subject, e.from_address, e.to_address,
+				e.reply_to_address, e.storage_key, e.size, e.receive_datetime, e.is_read, e.is_star,
+				e.direction, e.status, e.sending_address_id, e.user_id, e.body_plain
+			FROM email e
+			JOIN mailbox_user mu ON e.mailbox_id = mu.mailbox_id
+			WHERE e.mailbox_id = $1
+			  AND mu.user_id = $2
+			  AND mu.is_active = TRUE
+			  AND e.status != 'DELETED'
+			  AND e.search_vector @@ plainto_tsquery('english', $3)
+			  AND (e.receive_datetime, e.id) < ($5, $6)
+			ORDER BY e.receive_datetime DESC, e.id DESC
+			LIMIT $4
+		`, mailboxID, userID, query, limit, cursorTime, cursorID)
+	} else {
+		err = db.SelectContext(ctx, &emails, `
+			SELECT
+				e.id, e.mailbox_id, e.thread_id, e.address_mapping_id, e.ingestion_id, e.message_id,
+				e.in_reply_to, e."references", e.subject, e.from_address, e.to_address,
+				e.reply_to_address, e.storage_key, e.size, e.receive_datetime, e.is_read, e.is_star,
+				e.direction, e.status, e.sending_address_id, e.user_id, e.body_plain
+			FROM email e
+			JOIN mailbox_user mu ON e.mailbox_id = mu.mailbox_id
+			WHERE e.mailbox_id = $1
+			  AND mu.user_id = $2
+			  AND mu.is_active = TRUE
+			  AND e.status != 'DELETED'
+			  AND e.search_vector @@ plainto_tsquery('english', $3)
+			ORDER BY e.receive_datetime DESC, e.id DESC
+			LIMIT $4
+		`, mailboxID, userID, query, limit)
+	}
 	return emails, err
 }
