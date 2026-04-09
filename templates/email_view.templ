@@ -207,6 +207,8 @@ templ EmailDetail(email *models.Email, attachments []models.EmailAttachment, bod
 				</div>
 				<script>
 					document.querySelectorAll('.email-body-html a').forEach(function(a) {
+						const href = a.getAttribute('href') || '';
+						if (href.startsWith('#')) return;
 						a.setAttribute('target', '_blank');
 						a.setAttribute('rel', 'noopener noreferrer');
 					});

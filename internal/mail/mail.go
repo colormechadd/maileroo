@@ -53,6 +53,7 @@ func newEmailPolicy() *bluemonday.Policy {
 	// Links
 	p.AllowAttrs("href", "title", "target", "rel", "name").OnElements("a")
 	p.AllowURLSchemes("http", "https", "mailto", "data", "cid")
+	p.AllowRelativeURLs(true)
 
 	// Images
 	p.AllowAttrs("src", "alt", "title", "width", "height", "border", "align", "hspace", "vspace").OnElements("img")

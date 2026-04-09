@@ -388,9 +388,6 @@ templ MailboxContent(mailboxID uuid.UUID, filter string, emails []models.Email, 
 			/>
 			<span class="text-sm font-medium text-gray-500">Select All</span>
 		</div>
-		<div class="flex items-center gap-4">
-			<span class="text-xs font-medium text-gray-400">1-{ fmt.Sprintf("%d", len(emails)) } of { fmt.Sprintf("%d", len(emails)) }</span>
-		</div>
 	</div>
 
 	<!-- Email List -->
