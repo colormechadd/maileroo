@@ -55,49 +55,49 @@ func (bkd *Backend) NewSession(c *gosmtp.Conn) (gosmtp.Session, error) {
 
 	parsedIP := net.ParseIP(remoteIP)
 
-	// Check persistent IP block list
-	if parsedIP != nil {
-		blocked, err := bkd.rateLimitDB.IsIPBlocked(context.Background(), parsedIP)
-		if err != nil {
-			slog.Error("failed to check ip block", "ip", remoteIP, "error", err)
-		} else if blocked {
-			slog.Warn("smtp connection rejected: ip blocked", "ip", remoteIP)
-			return nil, &gosmtp.SMTPError{
-				Code:    421,
-				Message: "Your IP address is temporarily blocked",
-			}
-		}
-	}
+	// // Check persistent IP block list
+	// if parsedIP != nil {
+	// 	blocked, err := bkd.rateLimitDB.IsIPBlocked(context.Background(), parsedIP)
+	// 	if err != nil {
+	// 		slog.Error("failed to check ip block", "ip", remoteIP, "error", err)
+	// 	} else if blocked {
+	// 		slog.Warn("smtp connection rejected: ip blocked", "ip", remoteIP)
+	// 		return nil, &gosmtp.SMTPError{
+	// 			Code:    421,
+	// 			Message: "Your IP address is temporarily blocked",
+	// 		}
+	// 	}
+	// }
 
-	// In-memory per-IP rate limiting
-	if parsedIP != nil && bkd.rateCfg.SMTPConnectionsPerMinute > 0 {
-		limiter := bkd.getLimiter(remoteIP)
-		if !limiter.Allow() {
-			bkd.mu.Lock()
-			bkd.violations[remoteIP]++
-			violations := bkd.violations[remoteIP]
-			bkd.mu.Unlock()
+	// // In-memory per-IP rate limiting
+	// if parsedIP != nil && bkd.rateCfg.SMTPConnectionsPerMinute > 0 {
+	// 	limiter := bkd.getLimiter(remoteIP)
+	// 	if !limiter.Allow() {
+	// 		bkd.mu.Lock()
+	// 		bkd.violations[remoteIP]++
+	// 		violations := bkd.violations[remoteIP]
+	// 		bkd.mu.Unlock()
 
-			slog.Warn("smtp connection rate limited", "ip", remoteIP, "violations", violations)
+	// 		slog.Warn("smtp connection rate limited", "ip", remoteIP, "violations", violations)
 
-			if bkd.rateCfg.SMTPAutoBlockThreshold > 0 && violations >= bkd.rateCfg.SMTPAutoBlockThreshold {
-				until := time.Now().Add(bkd.rateCfg.SMTPAutoBlockDuration)
-				if err := bkd.rateLimitDB.AddIPBlock(context.Background(), parsedIP, "auto-blocked: rate limit exceeded", &until); err != nil {
-					slog.Error("failed to auto-block ip", "ip", remoteIP, "error", err)
-				} else {
-					slog.Warn("smtp ip auto-blocked", "ip", remoteIP, "until", until)
-					bkd.mu.Lock()
-					delete(bkd.violations, remoteIP)
-					bkd.mu.Unlock()
-				}
-			}
+	// 		if bkd.rateCfg.SMTPAutoBlockThreshold > 0 && violations >= bkd.rateCfg.SMTPAutoBlockThreshold {
+	// 			until := time.Now().Add(bkd.rateCfg.SMTPAutoBlockDuration)
+	// 			if err := bkd.rateLimitDB.AddIPBlock(context.Background(), parsedIP, "auto-blocked: rate limit exceeded", &until); err != nil {
+	// 				slog.Error("failed to auto-block ip", "ip", remoteIP, "error", err)
+	// 			} else {
+	// 				slog.Warn("smtp ip auto-blocked", "ip", remoteIP, "until", until)
+	// 				bkd.mu.Lock()
+	// 				delete(bkd.violations, remoteIP)
+	// 				bkd.mu.Unlock()
+	// 			}
+	// 		}
 
-			return nil, &gosmtp.SMTPError{
-				Code:    421,
-				Message: "Too many connections from your IP, please try again later",
-			}
-		}
-	}
+	// 		return nil, &gosmtp.SMTPError{
+	// 			Code:    421,
+	// 			Message: "Too many connections from your IP, please try again later",
+	// 		}
+	// 	}
+	// }
 
 	return &Session{
 		backend:  bkd,

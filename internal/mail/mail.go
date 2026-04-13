@@ -30,6 +30,7 @@ type Service struct {
 	storage     storage.Storage
 	compression string // "zstd", "gzip", "none"
 	policy      *bluemonday.Policy
+	signURL     func(string) string // nil when proxy is not configured
 }
 
 func newEmailPolicy() *bluemonday.Policy {
@@ -69,12 +70,13 @@ func newEmailPolicy() *bluemonday.Policy {
 	return p
 }
 
-func NewService(repo Repository, storage storage.Storage, compression string) *Service {
+func NewService(repo Repository, storage storage.Storage, compression string, signURL func(string) string) *Service {
 	return &Service{
 		repo:        repo,
 		storage:     storage,
 		compression: compression,
 		policy:      newEmailPolicy(),
+		signURL:     signURL,
 	}
 }
 
@@ -336,6 +338,9 @@ func (s *Service) FetchBody(ctx context.Context, email *models.Email) (string, b
 		if ct == "text/html" {
 			b, _ := io.ReadAll(p.Body)
 			content = s.policy.Sanitize(string(b))
+			if s.signURL != nil {
+				content = rewriteForPrivacy(content, s.signURL)
+			}
 			isHTML = true
 			break
 		}

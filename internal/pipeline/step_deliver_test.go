@@ -19,7 +19,7 @@ func TestDeliver(t *testing.T) {
 	cfg := &config.Config{}
 	cfg.Compression = "none"
 
-	mailSvc := mail.NewService(mockDB, mockStorage, "none")
+	mailSvc := mail.NewService(mockDB, mockStorage, "none", nil)
 	p := &Pipeline{cfg: cfg, db: mockDB, storage: mockStorage, mail: mailSvc}
 
 	mailboxID := uuid.New()

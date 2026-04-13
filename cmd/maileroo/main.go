@@ -16,6 +16,7 @@ import (
 	"github.com/colormechadd/maileroo/internal/config"
 	"github.com/colormechadd/maileroo/internal/db"
 	"github.com/colormechadd/maileroo/internal/mail"
+	"github.com/colormechadd/maileroo/internal/proxy"
 	"github.com/colormechadd/maileroo/internal/outbound"
 	"github.com/colormechadd/maileroo/internal/pipeline"
 	"github.com/colormechadd/maileroo/internal/rspamd"
@@ -103,7 +104,20 @@ func runServe() {
 	}
 
 	hub := web.NewHub()
-	mailSvc := mail.NewService(database, store, cfg.Compression)
+
+	csrfKey, err := base64.StdEncoding.DecodeString(cfg.Web.CSRFAuthKey)
+	if err != nil || len(csrfKey) != 32 {
+		slog.Error("WEB_CSRF_AUTH_KEY must be a base64-encoded 32-byte key")
+		os.Exit(1)
+	}
+	proxyKey, err := proxy.DeriveKey(csrfKey)
+	if err != nil {
+		slog.Error("failed to derive proxy signing key", "error", err)
+		os.Exit(1)
+	}
+	signURL := func(rawURL string) string { return proxy.SignURL(proxyKey, rawURL) }
+
+	mailSvc := mail.NewService(database, store, cfg.Compression, signURL)
 
 	// Initialize Pipeline
 	rspamdClient := rspamd.NewClient(cfg.Spam.RspamdURL)

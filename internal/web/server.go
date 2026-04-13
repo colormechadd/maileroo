@@ -24,6 +24,7 @@ import (
 	"github.com/colormechadd/maileroo/internal/config"
 	"github.com/colormechadd/maileroo/internal/db"
 	"github.com/colormechadd/maileroo/internal/mail"
+	"github.com/colormechadd/maileroo/internal/proxy"
 	"github.com/colormechadd/maileroo/internal/outbound"
 	"github.com/colormechadd/maileroo/internal/rspamd"
 	"github.com/colormechadd/maileroo/internal/storage"
@@ -42,6 +43,7 @@ type Server struct {
 
 	loginMu       sync.Mutex
 	loginLimiters map[string]*loginEntry
+	proxyKey      []byte
 }
 
 type loginEntry struct {
@@ -102,6 +104,11 @@ func (s *Server) Routes() http.Handler {
 	if err != nil || len(csrfKey) != 32 {
 		panic("WEB_CSRF_AUTH_KEY must be a base64-encoded 32-byte key")
 	}
+	if pk, err := proxy.DeriveKey(csrfKey); err != nil {
+		panic("failed to derive proxy signing key: " + err.Error())
+	} else {
+		s.proxyKey = pk
+	}
 	csrfMiddleware := csrf.Protect(
 		csrfKey,
 		csrf.Secure(true),
@@ -125,6 +132,7 @@ func (s *Server) Routes() http.Handler {
 	r.Get("/login", s.handleLoginGet)
 	r.Post("/login", s.handleLoginPost)
 	r.Post("/logout", s.handleLogout)
+	r.Get("/proxy/image", s.handleProxyImage)
 
 	r.Group(func(r chi.Router) {
 		r.Use(s.AuthMiddleware)
@@ -1499,4 +1507,108 @@ func parseAddresses(raw string) []string {
 		}
 	}
 	return res
+}
+
+// ---- Image proxy ----
+
+var privateIPNets = func() []*net.IPNet {
+	var nets []*net.IPNet
+	for _, cidr := range []string{
+		"127.0.0.0/8",
+		"10.0.0.0/8",
+		"172.16.0.0/12",
+		"192.168.0.0/16",
+		"169.254.0.0/16",
+		"::1/128",
+		"fc00::/7",
+		"fe80::/10",
+	} {
+		_, ipNet, _ := net.ParseCIDR(cidr)
+		nets = append(nets, ipNet)
+	}
+	return nets
+}()
+
+func isPrivateIP(ip net.IP) bool {
+	for _, ipNet := range privateIPNets {
+		if ipNet.Contains(ip) {
+			return true
+		}
+	}
+	return false
+}
+
+// ssrfSafeDialContext resolves the target hostname and rejects connections to
+// private/loopback IP ranges before dialing. This check runs after DNS
+// resolution so it catches DNS-based SSRF attempts.
+func ssrfSafeDialContext(ctx context.Context, network, addr string) (net.Conn, error) {
+	host, port, err := net.SplitHostPort(addr)
+	if err != nil {
+		return nil, err
+	}
+	addrs, err := net.DefaultResolver.LookupHost(ctx, host)
+	if err != nil {
+		return nil, err
+	}
+	for _, a := range addrs {
+		ip := net.ParseIP(a)
+		if ip == nil || isPrivateIP(ip) {
+			return nil, fmt.Errorf("proxy: address %s is not allowed", a)
+		}
+	}
+	return (&net.Dialer{}).DialContext(ctx, network, net.JoinHostPort(addrs[0], port))
+}
+
+var proxyHTTPClient = &http.Client{
+	Timeout: 10 * time.Second,
+	Transport: &http.Transport{
+		DialContext: ssrfSafeDialContext,
+	},
+	CheckRedirect: func(req *http.Request, via []*http.Request) error {
+		if len(via) >= 5 {
+			return fmt.Errorf("proxy: too many redirects")
+		}
+		return nil
+	},
+}
+
+// handleProxyImage fetches an externally-hosted image server-side and streams
+// it to the client, preventing the sender from learning the reader's IP.
+// The URL is HMAC-signed to prevent open-redirect and SSRF abuse.
+func (s *Server) handleProxyImage(w http.ResponseWriter, r *http.Request) {
+	rawURLBytes, err := base64.RawURLEncoding.DecodeString(r.URL.Query().Get("url"))
+	if err != nil {
+		http.Error(w, "bad request", http.StatusBadRequest)
+		return
+	}
+	rawURL := string(rawURLBytes)
+	sig := r.URL.Query().Get("sig")
+
+	if !proxy.VerifyURL(s.proxyKey, rawURL, sig) {
+		http.Error(w, "bad request", http.StatusBadRequest)
+		return
+	}
+
+	u, err := url.Parse(rawURL)
+	if err != nil || (u.Scheme != "http" && u.Scheme != "https") {
+		http.Error(w, "bad request", http.StatusBadRequest)
+		return
+	}
+
+	resp, err := proxyHTTPClient.Get(rawURL)
+	if err != nil {
+		http.Error(w, "bad gateway", http.StatusBadGateway)
+		return
+	}
+	defer resp.Body.Close()
+
+	ct := resp.Header.Get("Content-Type")
+	mediaType, _, _ := mime.ParseMediaType(ct)
+	if !strings.HasPrefix(mediaType, "image/") {
+		http.Error(w, "unsupported media type", http.StatusUnsupportedMediaType)
+		return
+	}
+
+	w.Header().Set("Content-Type", ct)
+	io.Copy(w, io.LimitReader(resp.Body, 10<<20))
 }

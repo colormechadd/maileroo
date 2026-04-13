@@ -66,6 +66,7 @@ func NewPipeline(cfg *config.Config, db db.PipelineDB, storage storage.Storage, 
 		name string
 		fn   Step
 	}{
+		{"strip_tracking_pixels", StripTrackingPixels},
 		{"deliver", Deliver},
 		{"parse_dsn", ParseDSN},
 		{"validate_sender", ValidateSender},

@@ -21,7 +21,7 @@ func TestProcess_Success(t *testing.T) {
 	cfg := &config.Config{}
 	cfg.Compression = "none"
 
-	mailSvc := mail.NewService(mockDB, mockStorage, "none")
+	mailSvc := mail.NewService(mockDB, mockStorage, "none", nil)
 	p := NewPipeline(cfg, mockDB, mockStorage, mockHub, mailSvc, nil)
 
 	// Override steps for controlled test
@@ -88,7 +88,7 @@ func TestProcess_FailureLeavesQuarantined(t *testing.T) {
 	cfg := &config.Config{}
 	cfg.Compression = "none"
 
-	mailSvc := mail.NewService(mockDB, mockStorage, "none")
+	mailSvc := mail.NewService(mockDB, mockStorage, "none", nil)
 	p := NewPipeline(cfg, mockDB, mockStorage, mockHub, mailSvc, nil)
 
 	failStep := func(ctx context.Context, p *Pipeline, ictx *IngestionContext) (StepStatus, any, error) {
