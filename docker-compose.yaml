@@ -3,12 +3,12 @@ services:
     build: .
     restart: always
     environment:
-      MAILEROO_DATABASE_URL: postgres://${DB_USER:-maileroo}:${DB_PASS:-maileroo_pass}@db:5432/${DB_NAME:-maileroo}?sslmode=disable
-      MAILEROO_WEB_PORT: 8080
-      MAILEROO_WEB_CSRF_SECURE: false
-      MAILEROO_LOG_LEVEL: info
-      MAILEROO_STORAGE_TYPE: local
-      MAILEROO_LOCAL_STORAGE_BASE_PATH: /app/data/emails
+      MAILAROO_DATABASE_URL: postgres://${DB_USER:-mailaroo}:${DB_PASS:-mailaroo_pass}@db:5432/${DB_NAME:-mailaroo}?sslmode=disable
+      MAILAROO_WEB_PORT: 8080
+      MAILAROO_WEB_CSRF_SECURE: false
+      MAILAROO_LOG_LEVEL: info
+      MAILAROO_STORAGE_TYPE: local
+      MAILAROO_LOCAL_STORAGE_BASE_PATH: /app/data/emails
     ports:
       - "8080:8080"
       - "25:25"
@@ -22,7 +22,7 @@ services:
   migrate:
     image: amacneil/dbmate
     environment:
-      DATABASE_URL: postgres://${DB_USER:-maileroo}:${DB_PASS:-maileroo_pass}@db:5432/${DB_NAME:-maileroo}?sslmode=disable
+      DATABASE_URL: postgres://${DB_USER:-mailaroo}:${DB_PASS:-mailaroo_pass}@db:5432/${DB_NAME:-mailaroo}?sslmode=disable
     volumes:
       - ./db/migrations:/db/migrations
     command: up
@@ -33,9 +33,9 @@ services:
     image: postgres:18-alpine
     restart: always
     environment:
-      POSTGRES_USER: ${DB_USER:-maileroo}
-      POSTGRES_PASSWORD: ${DB_PASS:-maileroo_pass}
-      POSTGRES_DB: ${DB_NAME:-maileroo}
+      POSTGRES_USER: ${DB_USER:-mailaroo}
+      POSTGRES_PASSWORD: ${DB_PASS:-mailaroo_pass}
+      POSTGRES_DB: ${DB_NAME:-mailaroo}
     ports:
       - "${DB_PORT:-5432}:5432"
     volumes:

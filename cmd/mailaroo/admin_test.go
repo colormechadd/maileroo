@@ -8,10 +8,10 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/colormechadd/maileroo/internal/config"
-	"github.com/colormechadd/maileroo/internal/db"
-	"github.com/colormechadd/maileroo/pkg/auth"
-	"github.com/colormechadd/maileroo/pkg/models"
+	"github.com/colormechadd/mailaroo/internal/config"
+	"github.com/colormechadd/mailaroo/internal/db"
+	"github.com/colormechadd/mailaroo/pkg/auth"
+	"github.com/colormechadd/mailaroo/pkg/models"
 	"github.com/google/uuid"
 	"github.com/jmoiron/sqlx"
 	_ "github.com/lib/pq"
@@ -37,7 +37,7 @@ func setupCLITestDB(t *testing.T) (*db.DB, func()) {
 		t.Fatal("DATABASE_URL must be set for CLI tests")
 	}
 	devURL = os.ExpandEnv(devURL)
-	testURL := strings.Replace(devURL, "/maileroo?", "/maileroo_test_cli?", 1)
+	testURL := strings.Replace(devURL, "/mailaroo?", "/mailaroo_test_cli?", 1)
 	if !strings.Contains(testURL, "sslmode=") {
 		if strings.Contains(testURL, "?") {
 			testURL += "&sslmode=disable"
@@ -47,14 +47,14 @@ func setupCLITestDB(t *testing.T) (*db.DB, func()) {
 	}
 
 	// 1. Create the test database if it doesn't exist
-	adminURL := strings.Replace(testURL, "/maileroo_test_cli?", "/postgres?", 1)
+	adminURL := strings.Replace(testURL, "/mailaroo_test_cli?", "/postgres?", 1)
 	adminDB, err := sqlx.Connect("postgres", adminURL)
 	if err != nil {
 		t.Fatalf("failed to connect to postgres for test db creation: %v", err)
 	}
-	_, _ = adminDB.Exec("SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname = 'maileroo_test_cli' AND pid <> pg_backend_pid()")
-	_, _ = adminDB.Exec("DROP DATABASE IF EXISTS maileroo_test_cli")
-	_, err = adminDB.Exec("CREATE DATABASE maileroo_test_cli")
+	_, _ = adminDB.Exec("SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname = 'mailaroo_test_cli' AND pid <> pg_backend_pid()")
+	_, _ = adminDB.Exec("DROP DATABASE IF EXISTS mailaroo_test_cli")
+	_, err = adminDB.Exec("CREATE DATABASE mailaroo_test_cli")
 	if err != nil {
 		t.Fatalf("failed to create test database: %v", err)
 	}
@@ -62,12 +62,12 @@ func setupCLITestDB(t *testing.T) (*db.DB, func()) {
 
 	// 2. Run migrations using dbmate
 	cmd := exec.Command("dbmate", "-u", testURL, "--no-dump-schema", "up")
-	cmd.Dir = "../../" 
+	cmd.Dir = "../../"
 	if out, err := cmd.CombinedOutput(); err != nil {
 		t.Fatalf("dbmate migration failed: %v\nOutput: %s", err, string(out))
 	}
 
-	os.Setenv("MAILEROO_DATABASE_URL", testURL)
+	os.Setenv("MAILAROO_DATABASE_URL", testURL)
 	os.Setenv("DATABASE_URL", testURL)
 
 	database, err := db.Connect(testURL)

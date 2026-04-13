@@ -2,8 +2,8 @@ root = "."
 tmp_dir = ".air"
 
 [build]
-cmd = "go generate ./... && go build -o ./.air/maileroo ./cmd/maileroo"
-full_bin = "./.air/maileroo"
+cmd = "go generate ./... && go build -o ./.air/mailaroo ./cmd/mailaroo"
+full_bin = "./.air/mailaroo"
 delay = 1000
 exclude_dir = [
     "data",

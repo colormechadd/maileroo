@@ -10,7 +10,7 @@ import templruntime "github.com/a-h/templ/runtime"
 
 import (
 	"fmt"
-	"github.com/colormechadd/maileroo/pkg/models"
+	"github.com/colormechadd/mailaroo/pkg/models"
 )
 
 func EmailPipeline(email *models.Email, steps []models.IngestionStep) templ.Component {

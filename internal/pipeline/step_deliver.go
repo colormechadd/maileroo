@@ -3,7 +3,7 @@ package pipeline
 import (
 	"context"
 
-	"github.com/colormechadd/maileroo/internal/mail"
+	"github.com/colormechadd/mailaroo/internal/mail"
 )
 
 // Deliver handles both storage and database persistence in one logical step

@@ -13,16 +13,16 @@ import (
 
 	"encoding/base64"
 
-	"github.com/colormechadd/maileroo/internal/config"
-	"github.com/colormechadd/maileroo/internal/db"
-	"github.com/colormechadd/maileroo/internal/mail"
-	"github.com/colormechadd/maileroo/internal/proxy"
-	"github.com/colormechadd/maileroo/internal/outbound"
-	"github.com/colormechadd/maileroo/internal/pipeline"
-	"github.com/colormechadd/maileroo/internal/rspamd"
-	"github.com/colormechadd/maileroo/internal/smtp"
-	"github.com/colormechadd/maileroo/internal/storage"
-	"github.com/colormechadd/maileroo/internal/web"
+	"github.com/colormechadd/mailaroo/internal/config"
+	"github.com/colormechadd/mailaroo/internal/db"
+	"github.com/colormechadd/mailaroo/internal/mail"
+	"github.com/colormechadd/mailaroo/internal/outbound"
+	"github.com/colormechadd/mailaroo/internal/pipeline"
+	"github.com/colormechadd/mailaroo/internal/proxy"
+	"github.com/colormechadd/mailaroo/internal/rspamd"
+	"github.com/colormechadd/mailaroo/internal/smtp"
+	"github.com/colormechadd/mailaroo/internal/storage"
+	"github.com/colormechadd/mailaroo/internal/web"
 	gosmtp "github.com/emersion/go-smtp"
 	"github.com/spf13/cobra"
 )
@@ -46,8 +46,8 @@ func init() {
 }
 
 var rootCmd = &cobra.Command{
-	Use:   "maileroo",
-	Short: "Maileroo is an all-in-one email platform",
+	Use:   "mailaroo",
+	Short: "MAILAROO is an all-in-one email platform",
 	PersistentPreRun: func(cmd *cobra.Command, args []string) {
 		var err error
 		cfg, err = config.LoadConfig()
@@ -75,7 +75,7 @@ func runServe() {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
-	slog.Info("Starting Maileroo Monolith...")
+	slog.Info("Starting MAILAROO Monolith...")
 
 	// Initialize Database
 	database, err := db.Connect(cfg.DatabaseURL)
@@ -128,7 +128,7 @@ func runServe() {
 	if cfg.DKIM.EncryptionKey != "" {
 		encKey, err := base64.StdEncoding.DecodeString(cfg.DKIM.EncryptionKey)
 		if err != nil || len(encKey) != 32 {
-			slog.Error("MAILEROO_DKIM_ENCRYPTION_KEY must be a base64-encoded 32-byte value")
+			slog.Error("MAILAROO_DKIM_ENCRYPTION_KEY must be a base64-encoded 32-byte value")
 			os.Exit(1)
 		}
 		dkimSigner = outbound.NewDKIMSigner(database, encKey)
@@ -217,7 +217,7 @@ func runServe() {
 	}()
 
 	<-ctx.Done()
-	slog.Info("Shutting down Maileroo...")
+	slog.Info("Shutting down MAILAROO...")
 
 	for _, s := range smtpServers {
 		s.Close()

@@ -6,7 +6,7 @@ templ Layout(title string, csrfToken string) {
 		<head>
 			<meta charset="UTF-8"/>
 			<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-			<title>{ title } - Maileroo</title>
+			<title>{ title } - MAILAROO</title>
 			<meta name="csrf-token" content={ csrfToken }/>
 			<link rel="icon" type="image/png" href="/static/img/favicon.png"/>
 			<link rel="stylesheet" href="/static/css/output.css"/>
@@ -18,9 +18,9 @@ templ Layout(title string, csrfToken string) {
 			<style>
 				[x-cloak] { display: none !important; }
 				trix-toolbar [data-trix-button-group="file-tools"] { display: none !important; }
-				trix-editor { 
-					min-height: 300px !important; 
-					border: none !important; 
+				trix-editor {
+					min-height: 300px !important;
+					border: none !important;
 					padding: 1.5rem !important;
 					outline: none !important;
 				}
@@ -35,7 +35,7 @@ templ Layout(title string, csrfToken string) {
 					document.querySelectorAll('[data-local-time]').forEach(el => {
 						const date = new Date(el.getAttribute('data-local-time'));
 						const format = el.getAttribute('data-format') || 'short';
-						
+
 						let options = {
 							hour: 'numeric',
 							minute: '2-digit',
@@ -43,10 +43,10 @@ templ Layout(title string, csrfToken string) {
 						};
 
 						if (format === 'full') {
-							options = { 
-								weekday: 'long', 
-								year: 'numeric', 
-								month: 'long', 
+							options = {
+								weekday: 'long',
+								year: 'numeric',
+								month: 'long',
 								day: 'numeric',
 								hour: 'numeric',
 								minute: '2-digit',

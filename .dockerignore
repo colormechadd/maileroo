@@ -3,7 +3,7 @@
 data
 bin
 tmp
-maileroo
+mailaroo
 static/css/output.css
 *_templ.go
 node_modules

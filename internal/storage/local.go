@@ -8,7 +8,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/colormechadd/maileroo/internal/config"
+	"github.com/colormechadd/mailaroo/internal/config"
 )
 
 type LocalStorage struct {

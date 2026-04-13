@@ -1,4 +1,4 @@
-package maileroo
+package mailaroo
 
 // Generate Templ components
 //go:generate templ generate

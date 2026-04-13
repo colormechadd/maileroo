@@ -5,7 +5,7 @@ import (
 	"net"
 	"testing"
 
-	"github.com/colormechadd/maileroo/internal/config"
+	"github.com/colormechadd/mailaroo/internal/config"
 	"github.com/stretchr/testify/assert"
 )
 

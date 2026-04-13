@@ -9,7 +9,7 @@ import "github.com/a-h/templ"
 import templruntime "github.com/a-h/templ/runtime"
 
 import (
-	"github.com/colormechadd/maileroo/pkg/models"
+	"github.com/colormechadd/mailaroo/pkg/models"
 )
 
 func ContactsPage(contacts []models.Contact, selected *models.Contact) templ.Component {

@@ -3,7 +3,7 @@ package pipeline
 import (
 	"context"
 
-	"github.com/colormechadd/maileroo/pkg/models"
+	"github.com/colormechadd/mailaroo/pkg/models"
 )
 
 // Finalize sets the status to INBOX once all checks pass

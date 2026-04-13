@@ -21,16 +21,16 @@ import (
 	"time"
 
 	"github.com/a-h/templ"
-	"github.com/colormechadd/maileroo/internal/config"
-	"github.com/colormechadd/maileroo/internal/db"
-	"github.com/colormechadd/maileroo/internal/mail"
-	"github.com/colormechadd/maileroo/internal/proxy"
-	"github.com/colormechadd/maileroo/internal/outbound"
-	"github.com/colormechadd/maileroo/internal/rspamd"
-	"github.com/colormechadd/maileroo/internal/storage"
-	"github.com/colormechadd/maileroo/pkg/auth"
-	"github.com/colormechadd/maileroo/pkg/models"
-	"github.com/colormechadd/maileroo/templates"
+	"github.com/colormechadd/mailaroo/internal/config"
+	"github.com/colormechadd/mailaroo/internal/db"
+	"github.com/colormechadd/mailaroo/internal/mail"
+	"github.com/colormechadd/mailaroo/internal/outbound"
+	"github.com/colormechadd/mailaroo/internal/proxy"
+	"github.com/colormechadd/mailaroo/internal/rspamd"
+	"github.com/colormechadd/mailaroo/internal/storage"
+	"github.com/colormechadd/mailaroo/pkg/auth"
+	"github.com/colormechadd/mailaroo/pkg/models"
+	"github.com/colormechadd/mailaroo/templates"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/google/uuid"
@@ -605,7 +605,7 @@ func (s *Server) handleLoginGet(w http.ResponseWriter, r *http.Request) {
 func (s *Server) render(w http.ResponseWriter, r *http.Request, user *models.User, mailboxes []models.Mailbox, currentMailboxID uuid.UUID, filter string, counts map[string]int, content templ.Component, title string) {
 	if r.Header.Get("HX-Request") == "true" && r.Header.Get("HX-History-Restore-Request") != "true" {
 		content.Render(r.Context(), w)
-		fmt.Fprintf(w, "<title>%s - Maileroo</title>", html.EscapeString(title))
+		fmt.Fprintf(w, "<title>%s - MAILAROO</title>", html.EscapeString(title))
 		return
 	}
 	templates.Dashboard(user, mailboxes, currentMailboxID, filter, counts, content, csrf.Token(r), title).Render(r.Context(), w)
@@ -686,7 +686,7 @@ func (s *Server) handleDashboard(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	s.render(w, r, user, mailboxes, uuid.Nil, "all", nil, templates.MailboxContent(uuid.Nil, "all", nil, "", false), "Maileroo")
+	s.render(w, r, user, mailboxes, uuid.Nil, "all", nil, templates.MailboxContent(uuid.Nil, "all", nil, "", false), "MAILAROO")
 }
 
 func (s *Server) handleMailboxView(w http.ResponseWriter, r *http.Request) {
@@ -1283,7 +1283,7 @@ func securityHeaders(next http.Handler) http.Handler {
 
 func (s *Server) AuthMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		cookie, err := r.Cookie("maileroo_session")
+		cookie, err := r.Cookie("mailaroo_session")
 		if err != nil {
 			if r.Header.Get("HX-Request") == "true" {
 				w.Header().Set("HX-Redirect", "/login")
@@ -1370,7 +1370,7 @@ func (s *Server) handleLoginPost(w http.ResponseWriter, r *http.Request) {
 	}
 
 	http.SetCookie(w, &http.Cookie{
-		Name:     "maileroo_session",
+		Name:     "mailaroo_session",
 		Value:    token,
 		Expires:  expires,
 		HttpOnly: true,
@@ -1383,7 +1383,7 @@ func (s *Server) handleLoginPost(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleLogout(w http.ResponseWriter, r *http.Request) {
-	cookie, err := r.Cookie("maileroo_session")
+	cookie, err := r.Cookie("mailaroo_session")
 	if err == nil {
 		if err := s.DB.ExpireWebmailSession(r.Context(), cookie.Value); err != nil {
 			slog.Error("failed to expire session on logout", "error", err)
@@ -1391,7 +1391,7 @@ func (s *Server) handleLogout(w http.ResponseWriter, r *http.Request) {
 	}
 
 	http.SetCookie(w, &http.Cookie{
-		Name:     "maileroo_session",
+		Name:     "mailaroo_session",
 		Value:    "",
 		Expires:  time.Now().Add(-1 * time.Hour),
 		HttpOnly: true,

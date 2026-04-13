@@ -4,7 +4,7 @@ import (
 	"context"
 	"io"
 
-	"github.com/colormechadd/maileroo/pkg/models"
+	"github.com/colormechadd/mailaroo/pkg/models"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/mock"
 )

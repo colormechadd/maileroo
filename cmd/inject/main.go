@@ -1,4 +1,4 @@
-// inject — send raw .eml files to the Maileroo SMTP server for testing.
+// inject — send raw .eml files to the MAILAROO SMTP server for testing.
 //
 // Usage:
 //
@@ -42,10 +42,10 @@ func main() {
 	}
 
 	var (
-		ok      atomic.Int64
+		ok       atomic.Int64
 		errCount atomic.Int64
-		wg      sync.WaitGroup
-		jobs    = make(chan string, len(files))
+		wg       sync.WaitGroup
+		jobs     = make(chan string, len(files))
 	)
 
 	for range workers {

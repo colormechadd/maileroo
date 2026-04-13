@@ -1,23 +1,23 @@
 .PHONY: build run test clean migrate-up migrate-down templ
 
 build: generate
-	go build -o maileroo cmd/maileroo/*.go
+	go build -o mailaroo cmd/mailaroo/*.go
 
 run: build
-	./maileroo serve
+	./mailaroo serve
 
 test:
 	go test ./...
 
 clean:
-	rm -f maileroo static/css/output.css
+	rm -f mailaroo static/css/output.css
 	find . -name "*_templ.go" -delete
 
 generate:
 	go generate ./...
 
 docker-build:
-	docker build -t maileroo .
+	docker build -t mailaroo .
 
 tailwind-watch:
 	tailwindcss -c ./tailwind.config.js -i ./static/css/input.css -o ./static/css/output.css --watch

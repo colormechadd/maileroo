@@ -7,8 +7,8 @@ import (
 	"net/mail"
 	"strings"
 
-	"github.com/colormechadd/maileroo/pkg/models"
-	"github.com/colormechadd/maileroo/templates"
+	"github.com/colormechadd/mailaroo/pkg/models"
+	"github.com/colormechadd/mailaroo/templates"
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
 )

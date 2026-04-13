@@ -1,6 +1,6 @@
-# Maileroo
+# MAILAROO
 
-Maileroo is a modern, all-in-one email platform built with Go. It serves as a monolithic application providing an SMTP engine for receiving emails, a sophisticated ingestion pipeline for validation and filtering, and a sleek webmail interface for end-users.
+MAILAROO is a modern, all-in-one email platform built with Go. It serves as a monolithic application providing an SMTP engine for receiving emails, a sophisticated ingestion pipeline for validation and filtering, and a sleek webmail interface for end-users.
 
 ## Core Features
 
@@ -71,18 +71,18 @@ Maileroo is a modern, all-in-one email platform built with Go. It serves as a mo
 
 **Create a user**:
 ```bash
-./maileroo admin user-create myuser mypassword
+./mailaroo admin user-create myuser mypassword
 ```
 
 **Create a mailbox**:
 ```bash
-./maileroo admin mailbox-create myuser Inbox
+./mailaroo admin mailbox-create myuser Inbox
 ```
 
 **Map an email address to a mailbox**:
 ```bash
 # Uses regex mapping
-./maileroo admin mapping-create <MAILBOX_ID> ".*@example.com"
+./mailaroo admin mapping-create <MAILBOX_ID> ".*@example.com"
 ```
 
 ## License

@@ -41,7 +41,7 @@ func LoginPage(err string, csrfToken string) templ.Component {
 				}()
 			}
 			ctx = templ.InitializeContext(ctx)
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<div class=\"min-h-screen flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8 bg-gradient-to-br from-purple-50 to-teal-50\"><div class=\"max-w-md w-full space-y-8 bg-white p-10 rounded-2xl shadow-xl border border-purple-100\"><div><img class=\"mx-auto h-24 w-auto\" src=\"/static/img/maileroo.png\" alt=\"Maileroo Logo\"><h2 class=\"mt-6 text-center text-4xl font-extrabold text-purple-900 tracking-tight\">Maileroo</h2><p class=\"mt-2 text-center text-sm text-teal-700 font-medium\">Sign in to your account</p></div><form class=\"mt-8 space-y-6\" action=\"/login\" method=\"POST\"><input type=\"hidden\" name=\"gorilla.csrf.Token\" value=\"")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<div class=\"min-h-screen flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8 bg-gradient-to-br from-purple-50 to-teal-50\"><div class=\"max-w-md w-full space-y-8 bg-white p-10 rounded-2xl shadow-xl border border-purple-100\"><div><img class=\"mx-auto h-24 w-auto\" src=\"/static/img/mailaroo.png\" alt=\"MAILAROO Logo\"><h2 class=\"mt-6 text-center text-4xl font-extrabold text-purple-900 tracking-tight\">MAILAROO</h2><p class=\"mt-2 text-center text-sm text-teal-700 font-medium\">Sign in to your account</p></div><form class=\"mt-8 space-y-6\" action=\"/login\" method=\"POST\"><input type=\"hidden\" name=\"gorilla.csrf.Token\" value=\"")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}

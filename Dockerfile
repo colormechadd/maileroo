@@ -20,7 +20,7 @@ COPY . .
 
 # Generate assets and build
 RUN go generate ./...
-RUN go build -o maileroo cmd/maileroo/*.go
+RUN go build -o mailaroo cmd/mailaroo/*.go
 
 # Stage 2: Runtime
 FROM debian:bookworm-slim
@@ -32,7 +32,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 WORKDIR /app
 
 # Copy binary and assets
-COPY --from=builder /app/maileroo .
+COPY --from=builder /app/mailaroo .
 COPY --from=builder /app/static ./static
 COPY --from=builder /app/db/migrations ./db/migrations
 
@@ -40,4 +40,4 @@ COPY --from=builder /app/db/migrations ./db/migrations
 EXPOSE 25 2525 8080
 
 # The root command of the binary starts the server by default
-ENTRYPOINT ["./maileroo"]
+ENTRYPOINT ["./mailaroo"]

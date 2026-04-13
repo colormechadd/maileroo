@@ -9,7 +9,7 @@ import (
 
 	gomail "github.com/emersion/go-message/mail"
 
-	"github.com/colormechadd/maileroo/internal/mail"
+	"github.com/colormechadd/mailaroo/internal/mail"
 )
 
 // StripTrackingPixels parses the raw email message, removes tracking pixels

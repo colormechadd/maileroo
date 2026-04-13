@@ -5,9 +5,9 @@ import (
 	"fmt"
 	"log"
 
-	"github.com/colormechadd/maileroo/internal/db"
-	"github.com/colormechadd/maileroo/pkg/auth"
-	"github.com/colormechadd/maileroo/pkg/models"
+	"github.com/colormechadd/mailaroo/internal/db"
+	"github.com/colormechadd/mailaroo/pkg/auth"
+	"github.com/colormechadd/mailaroo/pkg/models"
 	"github.com/google/uuid"
 	"github.com/spf13/cobra"
 )

@@ -10,9 +10,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/colormechadd/maileroo/internal/config"
-	"github.com/colormechadd/maileroo/internal/db"
-	"github.com/colormechadd/maileroo/internal/pipeline"
+	"github.com/colormechadd/mailaroo/internal/config"
+	"github.com/colormechadd/mailaroo/internal/db"
+	"github.com/colormechadd/mailaroo/internal/pipeline"
 	gosmtp "github.com/emersion/go-smtp"
 	"github.com/google/uuid"
 	"golang.org/x/time/rate"

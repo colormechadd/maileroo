@@ -122,7 +122,7 @@ func LoadConfig() (*Config, error) {
 		// It's okay if config file is not found
 	}
 
-	viper.SetEnvPrefix("MAILEROO")
+	viper.SetEnvPrefix("MAILAROO")
 	viper.AutomaticEnv()
 	viper.BindEnv("DATABASE_URL")
 	viper.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))

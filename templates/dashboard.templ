@@ -3,7 +3,7 @@ package templates
 import (
 	"encoding/base64"
 	"fmt"
-	"github.com/colormechadd/maileroo/pkg/models"
+	"github.com/colormechadd/mailaroo/pkg/models"
 	"github.com/google/uuid"
 	"net/url"
 	"sort"
@@ -122,7 +122,7 @@ templ SidebarFilterLink(mailboxID uuid.UUID, filterName string, label string, ic
 			<span>{ label }</span>
 		</div>
 		if count > 0 {
-			<span class={ "inline-flex items-center justify-center px-2 py-0.5 rounded-full text-[10px] font-bold", 
+			<span class={ "inline-flex items-center justify-center px-2 py-0.5 rounded-full text-[10px] font-bold",
 				templ.KV("bg-purple-600 text-white", isBadgePurple),
 				templ.KV("bg-gray-100 text-gray-600", !isBadgePurple) }>
 				{ fmt.Sprintf("%d", count) }
@@ -134,7 +134,7 @@ templ SidebarFilterLink(mailboxID uuid.UUID, filterName string, label string, ic
 templ Dashboard(user *models.User, mailboxes []models.Mailbox, currentMailboxID uuid.UUID, filter string, counts map[string]int, content templ.Component, csrfToken string, title string) {
 	{{ draftCount := counts["drafts"] }}
 	@Layout(title, csrfToken) {
-		<div class="flex h-screen w-full overflow-hidden" 
+		<div class="flex h-screen w-full overflow-hidden"
 			 id="dashboard-root"
 			 hx-ext="sse"
 			 sse-connect="/events"
@@ -142,16 +142,16 @@ templ Dashboard(user *models.User, mailboxes []models.Mailbox, currentMailboxID 
 		>
 			<!-- Listen for new-mail and refresh the list if we are in that mailbox -->
 			<div sse-swap="new-mail" hx-get={ "/mailbox/" + currentMailboxID.String() + "?filter=" + filter } hx-target="#main-content" class="hidden"></div>
-			
+
 			<!-- Sidebar -->
 			<aside class="w-64 flex-shrink-0 bg-white border-r border-purple-100 flex flex-col">
 				<div class="p-6">
 					<div class="flex items-center gap-3 mb-8">
-						<img class="h-10 w-auto" src="/static/img/maileroo.png" alt="Maileroo Logo"/>
-						<span class="text-xl font-extrabold text-gray-900 tracking-tight">Maileroo</span>
+						<img class="h-10 w-auto" src="/static/img/mailaroo.png" alt="MAILAROO Logo"/>
+						<span class="text-xl font-extrabold text-gray-900 tracking-tight">MAILAROO</span>
 					</div>
-					
-					<button 
+
+					<button
 						hx-get="/compose"
 						hx-target="#main-content"
 						hx-push-url="true"
@@ -196,7 +196,7 @@ templ Dashboard(user *models.User, mailboxes []models.Mailbox, currentMailboxID 
 								</svg>
 								{ mb.Name }
 							</button>
-								
+
 								<div class="pl-4 space-y-1" x-show={ "currentMailboxID === '" + mb.ID.String() + "'" } x-cloak>
 									@SidebarFilterLink(mb.ID, "all", "All", IconAll(), 0, currentMailboxID == mb.ID && filter == "all", true)
 									@SidebarFilterLink(mb.ID, "unread", "Unread", IconUnread(), counts["unread"], currentMailboxID == mb.ID && filter == "unread", true)
@@ -234,7 +234,7 @@ templ Dashboard(user *models.User, mailboxes []models.Mailbox, currentMailboxID 
 					</a>
 				</div>
 				<div class="p-4 border-t border-purple-100 bg-gray-50/50">
-					<div 
+					<div
 						class="flex items-center px-4 cursor-pointer hover:bg-purple-50 rounded-xl py-3 transition-colors group"
 						hx-get="/user-info"
 						hx-target="#main-content"

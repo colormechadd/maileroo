@@ -6,9 +6,9 @@ import (
 	"net"
 	"testing"
 
-	"github.com/colormechadd/maileroo/internal/config"
-	"github.com/colormechadd/maileroo/internal/mail"
-	"github.com/colormechadd/maileroo/pkg/models"
+	"github.com/colormechadd/mailaroo/internal/config"
+	"github.com/colormechadd/mailaroo/internal/mail"
+	"github.com/colormechadd/mailaroo/pkg/models"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/mock"
 )

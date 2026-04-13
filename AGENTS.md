@@ -1,6 +1,6 @@
-# Maileroo Project Architecture
+# MAILAROO Project Architecture
 
-Maileroo is an all-in-one email platform built with Go, focusing on simplicity, extensibility, and modern web patterns.
+MAILAROO is an all-in-one email platform built with Go, focusing on simplicity, extensibility, and modern web patterns.
 
 ## Core Components
 
@@ -11,11 +11,11 @@ Maileroo is an all-in-one email platform built with Go, focusing on simplicity, 
 
 ## Deployment
 
-- **Single Binary**: Maileroo is a monolith. Run it with a single executable from `cmd/maileroo`.
+- **Single Binary**: MAILAROO is a monolith. Run it with a single executable from `cmd/mailaroo`.
 
 ## Directory Structure
 
-- `cmd/maileroo`: Entry point for the monolith.
+- `cmd/mailaroo`: Entry point for the monolith.
 - `internal/`: Component logic.
 - `pkg/`: Shared models.
 - `migrations/`: SQL migrations.

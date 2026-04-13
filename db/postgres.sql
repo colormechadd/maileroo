@@ -99,7 +99,7 @@ CREATE TABLE public.contact (
 CREATE TABLE public.dkim_key (
     id uuid DEFAULT uuidv7() NOT NULL,
     domain text NOT NULL,
-    selector text DEFAULT 'maileroo'::text NOT NULL,
+    selector text DEFAULT 'mailaroo'::text NOT NULL,
     key_data bytea NOT NULL,
     is_active boolean DEFAULT true,
     create_datetime timestamp with time zone DEFAULT now(),

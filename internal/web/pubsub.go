@@ -3,7 +3,7 @@ package web
 import (
 	"sync"
 
-	"github.com/colormechadd/maileroo/internal/pipeline"
+	"github.com/colormechadd/mailaroo/internal/pipeline"
 	"github.com/google/uuid"
 )
 

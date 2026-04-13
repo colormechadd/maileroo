@@ -10,9 +10,9 @@ import (
 	"fmt"
 	"log"
 
-	"github.com/colormechadd/maileroo/internal/db"
-	"github.com/colormechadd/maileroo/internal/outbound"
-	"github.com/colormechadd/maileroo/pkg/models"
+	"github.com/colormechadd/mailaroo/internal/db"
+	"github.com/colormechadd/mailaroo/internal/outbound"
+	"github.com/colormechadd/mailaroo/pkg/models"
 	"github.com/google/uuid"
 	"github.com/spf13/cobra"
 )
@@ -32,11 +32,11 @@ func init() {
 
 func parseEncKey() []byte {
 	if cfg.DKIM.EncryptionKey == "" {
-		log.Fatal("MAILEROO_DKIM_ENCRYPTION_KEY is not set")
+		log.Fatal("MAILAROO_DKIM_ENCRYPTION_KEY is not set")
 	}
 	encKey, err := base64.StdEncoding.DecodeString(cfg.DKIM.EncryptionKey)
 	if err != nil || len(encKey) != 32 {
-		log.Fatal("MAILEROO_DKIM_ENCRYPTION_KEY must be a base64-encoded 32-byte value")
+		log.Fatal("MAILAROO_DKIM_ENCRYPTION_KEY must be a base64-encoded 32-byte value")
 	}
 	return encKey
 }
@@ -68,7 +68,7 @@ var dkimAddCmd = &cobra.Command{
 		key := &models.DKIMKey{
 			ID:       uuid.Must(uuid.NewV7()),
 			Domain:   domain,
-			Selector: "maileroo",
+			Selector: "mailaroo",
 			KeyData:  encrypted,
 			IsActive: true,
 		}

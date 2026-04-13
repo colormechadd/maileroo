@@ -12,7 +12,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/colormechadd/maileroo/pkg/models"
+	"github.com/colormechadd/mailaroo/pkg/models"
 	"github.com/emersion/go-msgauth/dkim"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -122,7 +122,7 @@ func makeSigner(t *testing.T) (*DKIMSigner, []byte) {
 
 	db := &mockDKIMDB{key: &models.DKIMKey{
 		Domain:   "example.com",
-		Selector: "maileroo",
+		Selector: "mailaroo",
 		KeyData:  encrypted,
 		IsActive: true,
 	}}
@@ -145,7 +145,7 @@ func TestSign_SignatureContainsDomainAndSelector(t *testing.T) {
 
 	s := string(signed)
 	assert.True(t, strings.Contains(s, "d=example.com"))
-	assert.True(t, strings.Contains(s, "s=maileroo"))
+	assert.True(t, strings.Contains(s, "s=mailaroo"))
 }
 
 func TestSign_OriginalBodyPreserved(t *testing.T) {
@@ -180,7 +180,7 @@ func TestSign_SignatureVerifies(t *testing.T) {
 
 	db := &mockDKIMDB{key: &models.DKIMKey{
 		Domain:   "example.com",
-		Selector: "maileroo",
+		Selector: "mailaroo",
 		KeyData:  encrypted,
 		IsActive: true,
 	}}
@@ -191,7 +191,7 @@ func TestSign_SignatureVerifies(t *testing.T) {
 
 	verifications, err := dkim.VerifyWithOptions(bytes.NewReader(signed), &dkim.VerifyOptions{
 		LookupTXT: func(domain string) ([]string, error) {
-			if domain == "maileroo._domainkey.example.com" {
+			if domain == "mailaroo._domainkey.example.com" {
 				return []string{dnsValue}, nil
 			}
 			return nil, fmt.Errorf("unexpected lookup: %s", domain)
@@ -209,7 +209,7 @@ func TestSign_WrongEncryptionKey(t *testing.T) {
 
 	db := &mockDKIMDB{key: &models.DKIMKey{
 		Domain:   "example.com",
-		Selector: "maileroo",
+		Selector: "mailaroo",
 		KeyData:  encrypted,
 		IsActive: true,
 	}}

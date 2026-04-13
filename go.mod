@@ -1,4 +1,4 @@
-module github.com/colormechadd/maileroo
+module github.com/colormechadd/mailaroo
 
 go 1.25.0
 

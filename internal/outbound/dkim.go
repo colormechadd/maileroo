@@ -10,7 +10,7 @@ import (
 	"crypto/x509"
 	"fmt"
 	"io"
-	"github.com/colormechadd/maileroo/pkg/models"
+	"github.com/colormechadd/mailaroo/pkg/models"
 	"github.com/emersion/go-msgauth/dkim"
 )
 

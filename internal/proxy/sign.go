@@ -9,7 +9,7 @@ import (
 	"golang.org/x/crypto/hkdf"
 )
 
-const proxyImageLabel = "maileroo-proxy-image"
+const proxyImageLabel = "mailaroo-proxy-image"
 
 // DeriveKey derives a stable 32-byte signing key from csrfKey using
 // HKDF-SHA256 with a fixed info label. The result is independent of any

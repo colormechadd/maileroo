@@ -7,7 +7,7 @@ import (
 	"path"
 
 	"cloud.google.com/go/storage"
-	"github.com/colormechadd/maileroo/internal/config"
+	"github.com/colormechadd/mailaroo/internal/config"
 )
 
 type GCSStorage struct {

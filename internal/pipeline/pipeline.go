@@ -7,12 +7,12 @@ import (
 	"net"
 	"time"
 
-	"github.com/colormechadd/maileroo/internal/config"
-	"github.com/colormechadd/maileroo/internal/db"
-	"github.com/colormechadd/maileroo/internal/mail"
-	"github.com/colormechadd/maileroo/internal/rspamd"
-	"github.com/colormechadd/maileroo/internal/storage"
-	"github.com/colormechadd/maileroo/pkg/models"
+	"github.com/colormechadd/mailaroo/internal/config"
+	"github.com/colormechadd/mailaroo/internal/db"
+	"github.com/colormechadd/mailaroo/internal/mail"
+	"github.com/colormechadd/mailaroo/internal/rspamd"
+	"github.com/colormechadd/mailaroo/internal/storage"
+	"github.com/colormechadd/mailaroo/pkg/models"
 	"github.com/google/uuid"
 )
 

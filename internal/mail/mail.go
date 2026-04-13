@@ -10,8 +10,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/colormechadd/maileroo/internal/storage"
-	"github.com/colormechadd/maileroo/pkg/models"
+	"github.com/colormechadd/mailaroo/internal/storage"
+	"github.com/colormechadd/mailaroo/pkg/models"
 	gomail "github.com/emersion/go-message/mail"
 	"github.com/google/uuid"
 	"github.com/klauspost/compress/zstd"
