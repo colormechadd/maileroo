@@ -1,6 +1,7 @@
 package templates
 
 import (
+	"encoding/json"
 	"fmt"
 	"github.com/colormechadd/mailaroo/pkg/models"
 	"github.com/google/uuid"
@@ -344,20 +345,26 @@ func filterConditionsSummary(rule *models.FilterRule) string {
 }
 
 func filterFormData(rule *models.FilterRule) string {
-	if rule == nil {
-		return `{ conditions: [{ field: 'from', operator: 'contains', value: '' }], addCondition() { this.conditions.push({ field: 'from', operator: 'contains', value: '' }); }, removeCondition(i) { this.conditions.splice(i, 1); } }`
+	type condData struct {
+		Field    string `json:"field"`
+		Operator string `json:"operator"`
+		Value    string `json:"value"`
 	}
-	conds := "["
-	for i, c := range rule.Conditions {
-		if i > 0 {
-			conds += ","
-		}
+	methods := `, addCondition() { this.conditions.push({ field: 'from', operator: 'contains', value: '' }); }, removeCondition(i) { this.conditions.splice(i, 1); } }`
+	if rule == nil {
+		return `{ conditions: [{ field: 'from', operator: 'contains', value: '' }]` + methods
+	}
+	conds := make([]condData, 0, len(rule.Conditions))
+	for _, c := range rule.Conditions {
 		val := ""
 		if c.Value != nil {
 			val = *c.Value
 		}
-		conds += fmt.Sprintf(`{ field: '%s', operator: '%s', value: '%s' }`, c.Field, c.Operator, val)
+		conds = append(conds, condData{Field: c.Field, Operator: c.Operator, Value: val})
 	}
-	conds += "]"
-	return fmt.Sprintf(`{ conditions: %s, addCondition() { this.conditions.push({ field: 'from', operator: 'contains', value: '' }); }, removeCondition(i) { this.conditions.splice(i, 1); } }`, conds)
+	b, err := json.Marshal(conds)
+	if err != nil {
+		b = []byte("[]")
+	}
+	return fmt.Sprintf(`{ conditions: %s%s`, b, methods)
 }
