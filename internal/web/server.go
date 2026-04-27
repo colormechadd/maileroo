@@ -174,6 +174,14 @@ func (s *Server) Routes() http.Handler {
 		r.Delete("/contacts/{contactID}", s.handleContactDelete)
 		r.Post("/contacts/{contactID}/favorite", s.handleContactToggleFavorite)
 		r.Post("/email/{emailID}/add-contact", s.handleAddContactFromEmail)
+
+		r.Get("/mailbox/{mailboxID}/filters", s.handleFilterRulesList)
+		r.Post("/mailbox/{mailboxID}/filters", s.handleFilterRuleCreate)
+		r.Get("/mailbox/{mailboxID}/filters/new", s.handleFilterRuleNew)
+		r.Get("/mailbox/{mailboxID}/filters/{ruleID}/edit", s.handleFilterRuleEdit)
+		r.Put("/mailbox/{mailboxID}/filters/{ruleID}", s.handleFilterRuleUpdate)
+		r.Delete("/mailbox/{mailboxID}/filters/{ruleID}", s.handleFilterRuleDelete)
+		r.Post("/mailbox/{mailboxID}/filters/reorder", s.handleFilterRuleReorder)
 	})
 
 	return csrfMiddleware(r)
@@ -1611,4 +1619,229 @@ func (s *Server) handleProxyImage(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", ct)
 	io.Copy(w, io.LimitReader(resp.Body, 10<<20))
+}
+
+func (s *Server) getMailboxForUser(r *http.Request, mailboxIDStr string, userID uuid.UUID) (uuid.UUID, []models.Mailbox, error) {
+	mailboxID, err := uuid.Parse(mailboxIDStr)
+	if err != nil {
+		return uuid.Nil, nil, err
+	}
+	mailboxes, err := s.DB.GetMailboxesByUserID(r.Context(), userID)
+	if err != nil {
+		return uuid.Nil, nil, err
+	}
+	for _, mb := range mailboxes {
+		if mb.ID == mailboxID {
+			return mailboxID, mailboxes, nil
+		}
+	}
+	return uuid.Nil, nil, fmt.Errorf("mailbox not found")
+}
+
+func (s *Server) handleFilterRulesList(w http.ResponseWriter, r *http.Request) {
+	user := r.Context().Value("user").(*models.User)
+	mailboxID, mailboxes, err := s.getMailboxForUser(r, chi.URLParam(r, "mailboxID"), user.ID)
+	if err != nil {
+		http.Error(w, "Not found", http.StatusNotFound)
+		return
+	}
+
+	rules, err := s.DB.ListFilterRules(r.Context(), mailboxID)
+	if err != nil {
+		slog.Error("failed to list filter rules", "mailbox_id", mailboxID, "error", err)
+		http.Error(w, "Internal error", http.StatusInternalServerError)
+		return
+	}
+
+	s.render(w, r, user, mailboxes, mailboxID, "all", nil, templates.FilterRulesList(mailboxID, rules), "Filters")
+}
+
+func (s *Server) handleFilterRuleNew(w http.ResponseWriter, r *http.Request) {
+	user := r.Context().Value("user").(*models.User)
+	mailboxID, mailboxes, err := s.getMailboxForUser(r, chi.URLParam(r, "mailboxID"), user.ID)
+	if err != nil {
+		http.Error(w, "Not found", http.StatusNotFound)
+		return
+	}
+
+	s.render(w, r, user, mailboxes, mailboxID, "all", nil, templates.FilterRuleForm(mailboxID, nil), "New Filter")
+}
+
+func (s *Server) handleFilterRuleCreate(w http.ResponseWriter, r *http.Request) {
+	user := r.Context().Value("user").(*models.User)
+	mailboxID, _, err := s.getMailboxForUser(r, chi.URLParam(r, "mailboxID"), user.ID)
+	if err != nil {
+		http.Error(w, "Not found", http.StatusNotFound)
+		return
+	}
+
+	rule, err := parseFilterRuleForm(r, mailboxID)
+	if err != nil {
+		http.Error(w, "Bad request: "+err.Error(), http.StatusBadRequest)
+		return
+	}
+	if err := s.DB.CreateFilterRule(r.Context(), rule); err != nil {
+		slog.Error("failed to create filter rule", "mailbox_id", mailboxID, "error", err)
+		http.Error(w, "Internal error", http.StatusInternalServerError)
+		return
+	}
+
+	http.Redirect(w, r, "/mailbox/"+mailboxID.String()+"/filters", http.StatusSeeOther)
+}
+
+func (s *Server) handleFilterRuleEdit(w http.ResponseWriter, r *http.Request) {
+	user := r.Context().Value("user").(*models.User)
+	mailboxID, mailboxes, err := s.getMailboxForUser(r, chi.URLParam(r, "mailboxID"), user.ID)
+	if err != nil {
+		http.Error(w, "Not found", http.StatusNotFound)
+		return
+	}
+
+	ruleID, err := uuid.Parse(chi.URLParam(r, "ruleID"))
+	if err != nil {
+		http.Error(w, "Invalid ID", http.StatusBadRequest)
+		return
+	}
+
+	rule, err := s.DB.GetFilterRuleByID(r.Context(), ruleID, mailboxID)
+	if err != nil {
+		http.Error(w, "Not found", http.StatusNotFound)
+		return
+	}
+
+	s.render(w, r, user, mailboxes, mailboxID, "all", nil, templates.FilterRuleForm(mailboxID, rule), "Edit Filter")
+}
+
+func (s *Server) handleFilterRuleUpdate(w http.ResponseWriter, r *http.Request) {
+	user := r.Context().Value("user").(*models.User)
+	mailboxID, _, err := s.getMailboxForUser(r, chi.URLParam(r, "mailboxID"), user.ID)
+	if err != nil {
+		http.Error(w, "Not found", http.StatusNotFound)
+		return
+	}
+
+	ruleID, err := uuid.Parse(chi.URLParam(r, "ruleID"))
+	if err != nil {
+		http.Error(w, "Invalid ID", http.StatusBadRequest)
+		return
+	}
+
+	rule, err := parseFilterRuleForm(r, mailboxID)
+	if err != nil {
+		http.Error(w, "Bad request: "+err.Error(), http.StatusBadRequest)
+		return
+	}
+	rule.ID = ruleID
+
+	if err := s.DB.UpdateFilterRule(r.Context(), rule); err != nil {
+		slog.Error("failed to update filter rule", "rule_id", ruleID, "error", err)
+		http.Error(w, "Internal error", http.StatusInternalServerError)
+		return
+	}
+
+	http.Redirect(w, r, "/mailbox/"+mailboxID.String()+"/filters", http.StatusSeeOther)
+}
+
+func (s *Server) handleFilterRuleDelete(w http.ResponseWriter, r *http.Request) {
+	user := r.Context().Value("user").(*models.User)
+	mailboxID, _, err := s.getMailboxForUser(r, chi.URLParam(r, "mailboxID"), user.ID)
+	if err != nil {
+		http.Error(w, "Not found", http.StatusNotFound)
+		return
+	}
+
+	ruleID, err := uuid.Parse(chi.URLParam(r, "ruleID"))
+	if err != nil {
+		http.Error(w, "Invalid ID", http.StatusBadRequest)
+		return
+	}
+
+	if err := s.DB.DeleteFilterRule(r.Context(), ruleID, mailboxID); err != nil {
+		slog.Error("failed to delete filter rule", "rule_id", ruleID, "error", err)
+		http.Error(w, "Internal error", http.StatusInternalServerError)
+		return
+	}
+	_ = user
+
+	w.Header().Set("HX-Redirect", "/mailbox/"+mailboxID.String()+"/filters")
+	w.WriteHeader(http.StatusOK)
+}
+
+func (s *Server) handleFilterRuleReorder(w http.ResponseWriter, r *http.Request) {
+	user := r.Context().Value("user").(*models.User)
+	mailboxID, _, err := s.getMailboxForUser(r, chi.URLParam(r, "mailboxID"), user.ID)
+	if err != nil {
+		http.Error(w, "Not found", http.StatusNotFound)
+		return
+	}
+	_ = user
+
+	if err := r.ParseForm(); err != nil {
+		http.Error(w, "Bad request", http.StatusBadRequest)
+		return
+	}
+
+	rawIDs := r.Form["rule_id"]
+	orderedIDs := make([]uuid.UUID, 0, len(rawIDs))
+	for _, raw := range rawIDs {
+		id, err := uuid.Parse(raw)
+		if err != nil {
+			http.Error(w, "Invalid ID", http.StatusBadRequest)
+			return
+		}
+		orderedIDs = append(orderedIDs, id)
+	}
+
+	if err := s.DB.ReorderFilterRules(r.Context(), mailboxID, orderedIDs); err != nil {
+		slog.Error("failed to reorder filter rules", "mailbox_id", mailboxID, "error", err)
+		http.Error(w, "Internal error", http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
+}
+
+func parseFilterRuleForm(r *http.Request, mailboxID uuid.UUID) (*models.FilterRule, error) {
+	if err := r.ParseForm(); err != nil {
+		return nil, err
+	}
+
+	action := r.FormValue("action")
+	name := strings.TrimSpace(r.FormValue("name"))
+	if name == "" {
+		name = "Filter rule"
+	}
+
+	rule := &models.FilterRule{
+		ID:             uuid.New(),
+		MailboxID:      mailboxID,
+		Name:           name,
+		IsActive:       r.FormValue("is_active") == "on" || r.FormValue("is_active") == "true",
+		MatchAll:       r.FormValue("match_all") != "false",
+		Action:         action,
+		StopProcessing: r.FormValue("stop_processing") != "false",
+	}
+
+	fields := r.Form["condition_field"]
+	operators := r.Form["condition_operator"]
+	values := r.Form["condition_value"]
+
+	for i := range fields {
+		if i >= len(operators) {
+			break
+		}
+		var val *string
+		if i < len(values) && values[i] != "" {
+			v := values[i]
+			val = &v
+		}
+		rule.Conditions = append(rule.Conditions, models.FilterCondition{
+			ID:       uuid.New(),
+			Field:    fields[i],
+			Operator: operators[i],
+			Value:    val,
+		})
+	}
+
+	return rule, nil
 }

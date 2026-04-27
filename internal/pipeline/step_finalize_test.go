@@ -16,12 +16,28 @@ func TestFinalize(t *testing.T) {
 	p := &Pipeline{db: mockDB}
 
 	emailID := uuid.New()
-	ictx := &IngestionContext{
-		EmailID: emailID,
-	}
 
-	t.Run("successful finalize", func(t *testing.T) {
-		mockDB.On("SetEmailStatus", mock.Anything, emailID, models.StatusInbox).Return(nil).Once()
+	t.Run("no filter action → inbox", func(t *testing.T) {
+		ictx := &IngestionContext{EmailID: emailID}
+		mockDB.On("SetEmailFields", mock.Anything, emailID, false, false, models.StatusInbox).Return(nil).Once()
+		status, _, err := Finalize(ctx, p, ictx)
+		assert.NoError(t, err)
+		assert.Equal(t, StatusPass, status)
+		mockDB.AssertExpectations(t)
+	})
+
+	t.Run("archive action", func(t *testing.T) {
+		ictx := &IngestionContext{EmailID: emailID, FilterAction: models.FilterActionArchive}
+		mockDB.On("SetEmailFields", mock.Anything, emailID, false, false, models.StatusArchived).Return(nil).Once()
+		status, _, err := Finalize(ctx, p, ictx)
+		assert.NoError(t, err)
+		assert.Equal(t, StatusPass, status)
+		mockDB.AssertExpectations(t)
+	})
+
+	t.Run("star action", func(t *testing.T) {
+		ictx := &IngestionContext{EmailID: emailID, FilterAction: models.FilterActionStar}
+		mockDB.On("SetEmailFields", mock.Anything, emailID, false, true, models.StatusInbox).Return(nil).Once()
 		status, _, err := Finalize(ctx, p, ictx)
 		assert.NoError(t, err)
 		assert.Equal(t, StatusPass, status)

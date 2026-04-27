@@ -68,6 +68,16 @@ func (m *MockDB) GetMailboxUserIDs(ctx context.Context, mailboxID uuid.UUID) ([]
 	return args.Get(0).([]uuid.UUID), args.Error(1)
 }
 
+func (m *MockDB) GetActiveFilterRulesForMailbox(ctx context.Context, mailboxID uuid.UUID) ([]*models.FilterRule, error) {
+	args := m.Called(ctx, mailboxID)
+	return args.Get(0).([]*models.FilterRule), args.Error(1)
+}
+
+func (m *MockDB) SetEmailFields(ctx context.Context, id uuid.UUID, isRead, isStar bool, status models.EmailStatus) error {
+	args := m.Called(ctx, id, isRead, isStar, status)
+	return args.Error(0)
+}
+
 type MockHub struct {
 	mock.Mock
 }

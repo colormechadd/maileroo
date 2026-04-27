@@ -1,0 +1,370 @@
+package templates
+
+import (
+	"encoding/json"
+	"fmt"
+	"github.com/colormechadd/mailaroo/pkg/models"
+	"github.com/google/uuid"
+)
+
+templ FilterRulesList(mailboxID uuid.UUID, rules []*models.FilterRule) {
+	<div class="flex-1 flex flex-col min-h-0 bg-gray-50">
+		<div class="bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between">
+			<div>
+				<h1 class="text-xl font-bold text-gray-900">Filter Rules</h1>
+				<p class="text-sm text-gray-500">Automatically sort incoming emails</p>
+			</div>
+			<a
+				href={ templ.URL("/mailbox/" + mailboxID.String() + "/filters/new") }
+				hx-get={ "/mailbox/" + mailboxID.String() + "/filters/new" }
+				hx-target="#main-content"
+				hx-push-url="true"
+				class="flex items-center gap-2 px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg text-sm font-semibold shadow-sm transition-all cursor-pointer"
+			>
+				<svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+					<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4"/>
+				</svg>
+				New Rule
+			</a>
+		</div>
+
+		<div class="flex-1 overflow-y-auto p-6">
+			<div class="max-w-3xl mx-auto">
+				if len(rules) == 0 {
+					<div class="flex flex-col items-center justify-center py-20 text-center">
+						<div class="h-12 w-12 rounded-full bg-purple-50 flex items-center justify-center mb-4">
+							<svg class="w-6 h-6 text-purple-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+								<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2a1 1 0 01-.293.707L13 13.414V19a1 1 0 01-.553.894l-4 2A1 1 0 017 21v-7.586L3.293 6.707A1 1 0 013 6V4z"/>
+							</svg>
+						</div>
+						<p class="text-sm font-medium text-gray-500">No filter rules yet</p>
+						<p class="text-xs text-gray-400 mt-1">Create a rule to automatically sort incoming email</p>
+					</div>
+				} else {
+					<div class="space-y-3">
+						for _, rule := range rules {
+							<div class="bg-white rounded-lg border border-gray-200 shadow-sm p-4 flex items-start gap-4">
+								<div class="flex-1 min-w-0">
+									<div class="flex items-center gap-2 mb-1">
+										<span class="font-semibold text-gray-900 truncate">{ rule.Name }</span>
+										if !rule.IsActive {
+											<span class="text-[10px] font-bold uppercase tracking-wider bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full">Inactive</span>
+										}
+										<span class={ "text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full", filterActionBadgeClass(rule.Action) }>{ rule.Action }</span>
+									</div>
+									<p class="text-xs text-gray-500">
+										{ filterConditionsSummary(rule) }
+									</p>
+								</div>
+								<div class="flex items-center gap-2 flex-shrink-0">
+									<a
+										href={ templ.URL("/mailbox/" + mailboxID.String() + "/filters/" + rule.ID.String() + "/edit") }
+										hx-get={ "/mailbox/" + mailboxID.String() + "/filters/" + rule.ID.String() + "/edit" }
+										hx-target="#main-content"
+										hx-push-url="true"
+										class="text-xs text-purple-600 hover:text-purple-800 font-medium cursor-pointer"
+									>Edit</a>
+									<button
+										hx-delete={ "/mailbox/" + mailboxID.String() + "/filters/" + rule.ID.String() }
+										hx-confirm="Delete this filter rule?"
+										hx-swap="none"
+										class="text-xs text-red-500 hover:text-red-700 font-medium cursor-pointer"
+									>Delete</button>
+								</div>
+							</div>
+						}
+					</div>
+				}
+			</div>
+		</div>
+	</div>
+}
+
+templ FilterRuleForm(mailboxID uuid.UUID, rule *models.FilterRule) {
+	{{ isEdit := rule != nil }}
+	{{ title := "New Filter Rule" }}
+	if isEdit {
+		{{ title = "Edit Filter Rule" }}
+	}
+	<div class="flex-1 flex flex-col min-h-0 bg-gray-50">
+		<div class="bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between">
+			<div>
+				<h1 class="text-xl font-bold text-gray-900">{ title }</h1>
+			</div>
+			<a
+				href={ templ.URL("/mailbox/" + mailboxID.String() + "/filters") }
+				hx-get={ "/mailbox/" + mailboxID.String() + "/filters" }
+				hx-target="#main-content"
+				hx-push-url="true"
+				class="text-sm text-gray-500 hover:text-gray-700 cursor-pointer"
+			>Cancel</a>
+		</div>
+
+		<div class="flex-1 overflow-y-auto p-6">
+			<div class="max-w-2xl mx-auto">
+				{{ formAction := "/mailbox/" + mailboxID.String() + "/filters" }}
+				if isEdit {
+					{{ formAction = "/mailbox/" + mailboxID.String() + "/filters/" + rule.ID.String() }}
+				}
+				<form
+					method="POST"
+					action={ templ.URL(formAction) }
+					class="space-y-6"
+					x-data={ filterFormData(rule) }
+				>
+					if isEdit {
+						<input type="hidden" name="_method" value="PUT"/>
+					}
+
+					<!-- Name -->
+					<div class="bg-white rounded-lg border border-gray-200 shadow-sm p-5 space-y-4">
+						<h2 class="text-sm font-bold text-gray-700 uppercase tracking-wider">Rule Details</h2>
+						<div>
+							<label class="block text-sm font-medium text-gray-700 mb-1">Rule name</label>
+							<input
+								type="text"
+								name="name"
+								placeholder="e.g. Archive newsletters"
+								if isEdit {
+									value={ rule.Name }
+								}
+								class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-purple-300"
+							/>
+						</div>
+						<div class="flex items-center gap-6">
+							<label class="flex items-center gap-2 cursor-pointer">
+								<input type="checkbox" name="is_active" value="on"
+									if isEdit && rule.IsActive {
+										checked
+									}
+									if !isEdit {
+										checked
+									}
+									class="rounded border-gray-300 text-purple-600 focus:ring-purple-500"
+								/>
+								<span class="text-sm text-gray-700">Active</span>
+							</label>
+							<label class="flex items-center gap-2 cursor-pointer">
+								<input type="checkbox" name="stop_processing" value="on"
+									if isEdit && rule.StopProcessing {
+										checked
+									}
+									if !isEdit {
+										checked
+									}
+									class="rounded border-gray-300 text-purple-600 focus:ring-purple-500"
+								/>
+								<span class="text-sm text-gray-700">Stop processing further rules on match</span>
+							</label>
+						</div>
+					</div>
+
+					<!-- Conditions -->
+					<div class="bg-white rounded-lg border border-gray-200 shadow-sm p-5 space-y-4">
+						<div class="flex items-center justify-between">
+							<h2 class="text-sm font-bold text-gray-700 uppercase tracking-wider">Conditions</h2>
+							<div class="flex items-center gap-3">
+								<span class="text-xs text-gray-500">Match</span>
+								<select name="match_all" class="text-xs border border-gray-300 rounded px-2 py-1 focus:outline-none focus:ring-2 focus:ring-purple-300">
+									<option value="true"
+										if !isEdit || rule.MatchAll {
+											selected
+										}
+									>all (AND)</option>
+									<option value="false"
+										if isEdit && !rule.MatchAll {
+											selected
+										}
+									>any (OR)</option>
+								</select>
+							</div>
+						</div>
+
+						<div class="space-y-2" id="conditions-list">
+							<template x-for="(cond, index) in conditions" :key="index">
+								<div class="flex items-center gap-2">
+									<select :name="'condition_field'" class="text-sm border border-gray-300 rounded-lg px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-purple-300" x-model="cond.field">
+										<option value="from">From</option>
+										<option value="to">To</option>
+										<option value="subject">Subject</option>
+										<option value="body">Body</option>
+										<option value="has_attachment">Has Attachment</option>
+									</select>
+									<select :name="'condition_operator'" class="text-sm border border-gray-300 rounded-lg px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-purple-300" x-model="cond.operator">
+										<template x-if="cond.field !== 'has_attachment'">
+											<option value="contains">contains</option>
+										</template>
+										<template x-if="cond.field !== 'has_attachment'">
+											<option value="not_contains">does not contain</option>
+										</template>
+										<template x-if="cond.field !== 'has_attachment'">
+											<option value="is">is</option>
+										</template>
+										<template x-if="cond.field !== 'has_attachment'">
+											<option value="is_not">is not</option>
+										</template>
+										<template x-if="cond.field !== 'has_attachment'">
+											<option value="matches_regex">matches regex</option>
+										</template>
+										<template x-if="cond.field === 'has_attachment'">
+											<option value="is">is true</option>
+										</template>
+										<template x-if="cond.field === 'has_attachment'">
+											<option value="is_not">is false</option>
+										</template>
+									</select>
+									<input
+										x-show="cond.field !== 'has_attachment'"
+										:name="'condition_value'"
+										x-model="cond.value"
+										type="text"
+										placeholder="value"
+										class="flex-1 text-sm border border-gray-300 rounded-lg px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-purple-300"
+									/>
+									<input x-show="cond.field === 'has_attachment'" type="hidden" :name="'condition_value'" value=""/>
+									<button type="button" @click="removeCondition(index)" class="text-gray-400 hover:text-red-500 transition-colors cursor-pointer flex-shrink-0">
+										<svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+											<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+										</svg>
+									</button>
+								</div>
+							</template>
+						</div>
+
+						<button
+							type="button"
+							@click="addCondition()"
+							class="flex items-center gap-1.5 text-sm text-purple-600 hover:text-purple-800 font-medium cursor-pointer"
+						>
+							<svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+								<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4"/>
+							</svg>
+							Add condition
+						</button>
+					</div>
+
+					<!-- Action -->
+					<div class="bg-white rounded-lg border border-gray-200 shadow-sm p-5 space-y-3">
+						<h2 class="text-sm font-bold text-gray-700 uppercase tracking-wider">Action</h2>
+						<div class="grid grid-cols-2 gap-2 sm:grid-cols-3">
+							for _, opt := range filterActionOptions() {
+								<label class="flex items-center gap-2 p-3 border border-gray-200 rounded-lg cursor-pointer hover:border-purple-400 transition-colors has-[:checked]:border-purple-500 has-[:checked]:bg-purple-50">
+									<input
+										type="radio"
+										name="action"
+										value={ opt.value }
+										if isEdit && rule.Action == opt.value {
+											checked
+										}
+										if !isEdit && opt.value == "archive" {
+											checked
+										}
+										class="text-purple-600 focus:ring-purple-500"
+									/>
+									<span class="text-sm font-medium text-gray-700">{ opt.label }</span>
+								</label>
+							}
+						</div>
+					</div>
+
+					<div class="flex justify-end gap-3">
+						<a
+							href={ templ.URL("/mailbox/" + mailboxID.String() + "/filters") }
+							hx-get={ "/mailbox/" + mailboxID.String() + "/filters" }
+							hx-target="#main-content"
+							hx-push-url="true"
+							class="px-4 py-2 text-sm font-medium text-gray-700 hover:text-gray-900 cursor-pointer"
+						>Cancel</a>
+						<button
+							type="submit"
+							class="px-6 py-2 bg-purple-600 hover:bg-purple-700 text-white text-sm font-semibold rounded-lg shadow-sm transition-all cursor-pointer"
+						>Save Rule</button>
+					</div>
+				</form>
+			</div>
+		</div>
+	</div>
+}
+
+type filterActionOption struct {
+	value string
+	label string
+}
+
+func filterActionOptions() []filterActionOption {
+	return []filterActionOption{
+		{models.FilterActionArchive, "Archive"},
+		{models.FilterActionDelete, "Delete"},
+		{models.FilterActionMarkRead, "Mark as Read"},
+		{models.FilterActionStar, "Star"},
+		{models.FilterActionQuarantine, "Quarantine"},
+	}
+}
+
+func filterActionBadgeClass(action string) string {
+	switch action {
+	case models.FilterActionArchive:
+		return "bg-blue-100 text-blue-700"
+	case models.FilterActionDelete:
+		return "bg-red-100 text-red-700"
+	case models.FilterActionMarkRead:
+		return "bg-green-100 text-green-700"
+	case models.FilterActionStar:
+		return "bg-yellow-100 text-yellow-700"
+	case models.FilterActionQuarantine:
+		return "bg-orange-100 text-orange-700"
+	default:
+		return "bg-gray-100 text-gray-600"
+	}
+}
+
+func filterConditionsSummary(rule *models.FilterRule) string {
+	if len(rule.Conditions) == 0 {
+		return "No conditions"
+	}
+	joiner := " AND "
+	if !rule.MatchAll {
+		joiner = " OR "
+	}
+	parts := make([]string, 0, len(rule.Conditions))
+	for _, c := range rule.Conditions {
+		val := ""
+		if c.Value != nil {
+			val = " \"" + *c.Value + "\""
+		}
+		parts = append(parts, c.Field+" "+c.Operator+val)
+	}
+	result := ""
+	for i, p := range parts {
+		if i > 0 {
+			result += joiner
+		}
+		result += p
+	}
+	return result
+}
+
+func filterFormData(rule *models.FilterRule) string {
+	type condData struct {
+		Field    string `json:"field"`
+		Operator string `json:"operator"`
+		Value    string `json:"value"`
+	}
+	methods := `, addCondition() { this.conditions.push({ field: 'from', operator: 'contains', value: '' }); }, removeCondition(i) { this.conditions.splice(i, 1); } }`
+	if rule == nil {
+		return `{ conditions: [{ field: 'from', operator: 'contains', value: '' }]` + methods
+	}
+	conds := make([]condData, 0, len(rule.Conditions))
+	for _, c := range rule.Conditions {
+		val := ""
+		if c.Value != nil {
+			val = *c.Value
+		}
+		conds = append(conds, condData{Field: c.Field, Operator: c.Operator, Value: val})
+	}
+	b, err := json.Marshal(conds)
+	if err != nil {
+		b = []byte("[]")
+	}
+	return fmt.Sprintf(`{ conditions: %s%s`, b, methods)
+}

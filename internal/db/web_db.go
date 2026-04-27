@@ -53,6 +53,13 @@ type WebDB interface {
 	UpsertContactFromEmail(ctx context.Context, userID uuid.UUID, email, firstName, lastName string) error
 
 	CreateBlockRule(ctx context.Context, mailboxID uuid.UUID, addressPattern string) error
+
+	ListFilterRules(ctx context.Context, mailboxID uuid.UUID) ([]*models.FilterRule, error)
+	GetFilterRuleByID(ctx context.Context, ruleID, mailboxID uuid.UUID) (*models.FilterRule, error)
+	CreateFilterRule(ctx context.Context, rule *models.FilterRule) error
+	UpdateFilterRule(ctx context.Context, rule *models.FilterRule) error
+	DeleteFilterRule(ctx context.Context, ruleID, mailboxID uuid.UUID) error
+	ReorderFilterRules(ctx context.Context, mailboxID uuid.UUID, orderedIDs []uuid.UUID) error
 }
 
 func (db *DB) CreateWebmailSession(ctx context.Context, userID uuid.UUID, token string, remoteIP, userAgent string, expires time.Time) error {

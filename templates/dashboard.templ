@@ -210,6 +210,20 @@ templ Dashboard(user *models.User, mailboxes []models.Mailbox, currentMailboxID 
 									} else {
 										@SidebarFilterLink(mb.ID, "drafts", "Drafts", IconDrafts(), 0, false, true)
 									}
+									<a
+										href={ templ.URL("/mailbox/" + mb.ID.String() + "/filters") }
+										hx-get={ "/mailbox/" + mb.ID.String() + "/filters" }
+										hx-target="#main-content"
+										hx-push-url="true"
+										class="flex items-center gap-3 px-4 py-2 text-sm font-medium rounded-lg transition-colors cursor-pointer group text-gray-500 hover:text-purple-600 hover:bg-purple-50/50"
+									>
+										<div class="h-5 w-5 text-gray-400 group-hover:text-purple-500">
+											<svg fill="none" viewBox="0 0 24 24" stroke="currentColor">
+												<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2a1 1 0 01-.293.707L13 13.414V19a1 1 0 01-.553.894l-4 2A1 1 0 017 21v-7.586L3.293 6.707A1 1 0 013 6V4z"/>
+											</svg>
+										</div>
+										<span>Filters</span>
+									</a>
 								</div>
 							</div>
 					}

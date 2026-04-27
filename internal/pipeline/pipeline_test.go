@@ -57,7 +57,7 @@ func TestProcess_Success(t *testing.T) {
 		return s.StepName == "deliver" && s.Status == "pass"
 	})).Return(nil).Once()
 
-	mockDB.On("SetEmailStatus", mock.Anything, mock.Anything, models.StatusInbox).Return(nil).Once()
+	mockDB.On("SetEmailFields", mock.Anything, mock.Anything, false, false, models.StatusInbox).Return(nil).Once()
 	mockDB.On("CreateIngestionStep", mock.Anything, mock.MatchedBy(func(s *models.IngestionStep) bool {
 		return s.StepName == "finalize" && s.Status == "pass"
 	})).Return(nil).Once()

@@ -21,6 +21,8 @@ type PipelineDB interface {
 	FindThreadIDByMessageIDs(ctx context.Context, mailboxID uuid.UUID, messageIDs []string) (uuid.UUID, error)
 	UpdateOutboundJobFailed(ctx context.Context, id uuid.UUID, lastError string) error
 	GetMailboxUserIDs(ctx context.Context, mailboxID uuid.UUID) ([]uuid.UUID, error)
+	GetActiveFilterRulesForMailbox(ctx context.Context, mailboxID uuid.UUID) ([]*models.FilterRule, error)
+	SetEmailFields(ctx context.Context, id uuid.UUID, isRead, isStar bool, status models.EmailStatus) error
 }
 
 func (db *DB) CreateIngestion(ctx context.Context, ingestion *models.Ingestion) error {
@@ -136,4 +138,60 @@ func (db *DB) GetMailboxUserIDs(ctx context.Context, mailboxID uuid.UUID) ([]uui
 		SELECT user_id FROM mailbox_user WHERE mailbox_id = $1 AND is_active = TRUE
 	`, mailboxID)
 	return ids, err
+}
+
+func (db *DB) GetActiveFilterRulesForMailbox(ctx context.Context, mailboxID uuid.UUID) ([]*models.FilterRule, error) {
+	var rules []*models.FilterRule
+	err := db.SelectContext(ctx, &rules, `
+		SELECT id, mailbox_id, name, priority, is_active, match_all, action, stop_processing,
+		       created_by_user_id, updated_by_user_id, create_datetime, update_datetime
+		FROM mailbox_filter_rule
+		WHERE mailbox_id = $1 AND is_active = TRUE
+		ORDER BY priority ASC
+	`, mailboxID)
+	if err != nil {
+		return nil, err
+	}
+
+	if len(rules) == 0 {
+		return rules, nil
+	}
+
+	ruleIDs := make([]uuid.UUID, len(rules))
+	ruleIndex := make(map[uuid.UUID]*models.FilterRule, len(rules))
+	for i, r := range rules {
+		ruleIDs[i] = r.ID
+		ruleIndex[r.ID] = r
+	}
+
+	query, args, err := sqlx.In(`
+		SELECT id, rule_id, field, operator, value, create_datetime
+		FROM mailbox_filter_condition
+		WHERE rule_id IN (?)
+		ORDER BY create_datetime ASC
+	`, ruleIDs)
+	if err != nil {
+		return nil, err
+	}
+	query = db.Rebind(query)
+
+	var conditions []models.FilterCondition
+	if err := db.SelectContext(ctx, &conditions, query, args...); err != nil {
+		return nil, err
+	}
+
+	for _, c := range conditions {
+		r := ruleIndex[c.RuleID]
+		r.Conditions = append(r.Conditions, c)
+	}
+
+	return rules, nil
+}
+
+func (db *DB) SetEmailFields(ctx context.Context, id uuid.UUID, isRead, isStar bool, status models.EmailStatus) error {
+	_, err := db.ExecContext(ctx, `
+		UPDATE email SET is_read = $1, is_star = $2, status = $3, update_datetime = CURRENT_TIMESTAMP
+		WHERE id = $4
+	`, isRead, isStar, status, id)
+	return err
 }

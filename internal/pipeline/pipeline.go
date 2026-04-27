@@ -73,6 +73,7 @@ func NewPipeline(cfg *config.Config, db db.PipelineDB, storage storage.Storage, 
 		{"spam", ValidateRBL},
 		{"check_spam", CheckSpam},
 		{"block", CheckBlockingRules},
+		{"apply_filter_rules", ApplyFilterRules},
 		{"finalize", Finalize},
 		{"notify", Notify},
 	}
@@ -90,6 +91,8 @@ type IngestionContext struct {
 	AddressMappingID uuid.UUID
 	StorageKey       string
 	EmailID          uuid.UUID
+	MatchedFilterRuleID *uuid.UUID
+	FilterAction        string
 }
 
 func (p *Pipeline) Process(ctx context.Context, ictx *IngestionContext) error {
