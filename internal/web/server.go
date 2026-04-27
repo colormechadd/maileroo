@@ -1680,9 +1680,6 @@ func (s *Server) handleFilterRuleCreate(w http.ResponseWriter, r *http.Request) 
 		http.Error(w, "Bad request: "+err.Error(), http.StatusBadRequest)
 		return
 	}
-	rule.CreatedByUserID = &user.ID
-	rule.UpdatedByUserID = &user.ID
-
 	if err := s.DB.CreateFilterRule(r.Context(), rule); err != nil {
 		slog.Error("failed to create filter rule", "mailbox_id", mailboxID, "error", err)
 		http.Error(w, "Internal error", http.StatusInternalServerError)
@@ -1735,7 +1732,6 @@ func (s *Server) handleFilterRuleUpdate(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 	rule.ID = ruleID
-	rule.UpdatedByUserID = &user.ID
 
 	if err := s.DB.UpdateFilterRule(r.Context(), rule); err != nil {
 		slog.Error("failed to update filter rule", "rule_id", ruleID, "error", err)

@@ -11,8 +11,7 @@ import (
 func (db *DB) ListFilterRules(ctx context.Context, mailboxID uuid.UUID) ([]*models.FilterRule, error) {
 	var rules []*models.FilterRule
 	err := db.SelectContext(ctx, &rules, `
-		SELECT id, mailbox_id, name, priority, is_active, match_all, action, stop_processing,
-		       created_by_user_id, updated_by_user_id, create_datetime, update_datetime
+		SELECT id, mailbox_id, name, priority, is_active, match_all, action, stop_processing
 		FROM mailbox_filter_rule
 		WHERE mailbox_id = $1
 		ORDER BY priority ASC
@@ -33,10 +32,10 @@ func (db *DB) ListFilterRules(ctx context.Context, mailboxID uuid.UUID) ([]*mode
 	}
 
 	query, args, err := sqlx.In(`
-		SELECT id, rule_id, field, operator, value, create_datetime
+		SELECT id, rule_id, field, operator, value
 		FROM mailbox_filter_condition
 		WHERE rule_id IN (?)
-		ORDER BY create_datetime ASC
+		ORDER BY id ASC
 	`, ruleIDs)
 	if err != nil {
 		return nil, err
@@ -58,8 +57,7 @@ func (db *DB) ListFilterRules(ctx context.Context, mailboxID uuid.UUID) ([]*mode
 func (db *DB) GetFilterRuleByID(ctx context.Context, ruleID, mailboxID uuid.UUID) (*models.FilterRule, error) {
 	var rule models.FilterRule
 	err := db.GetContext(ctx, &rule, `
-		SELECT id, mailbox_id, name, priority, is_active, match_all, action, stop_processing,
-		       created_by_user_id, updated_by_user_id, create_datetime, update_datetime
+		SELECT id, mailbox_id, name, priority, is_active, match_all, action, stop_processing
 		FROM mailbox_filter_rule
 		WHERE id = $1 AND mailbox_id = $2
 	`, ruleID, mailboxID)
@@ -68,10 +66,10 @@ func (db *DB) GetFilterRuleByID(ctx context.Context, ruleID, mailboxID uuid.UUID
 	}
 
 	err = db.SelectContext(ctx, &rule.Conditions, `
-		SELECT id, rule_id, field, operator, value, create_datetime
+		SELECT id, rule_id, field, operator, value
 		FROM mailbox_filter_condition
 		WHERE rule_id = $1
-		ORDER BY create_datetime ASC
+		ORDER BY id ASC
 	`, ruleID)
 	return &rule, err
 }
@@ -80,9 +78,9 @@ func (db *DB) CreateFilterRule(ctx context.Context, rule *models.FilterRule) err
 	return db.WithTx(ctx, func(tx *sqlx.Tx) error {
 		_, err := tx.NamedExecContext(ctx, `
 			INSERT INTO mailbox_filter_rule
-				(id, mailbox_id, name, priority, is_active, match_all, action, stop_processing, created_by_user_id, updated_by_user_id)
+				(id, mailbox_id, name, priority, is_active, match_all, action, stop_processing)
 			VALUES
-				(:id, :mailbox_id, :name, :priority, :is_active, :match_all, :action, :stop_processing, :created_by_user_id, :updated_by_user_id)
+				(:id, :mailbox_id, :name, :priority, :is_active, :match_all, :action, :stop_processing)
 		`, rule)
 		if err != nil {
 			return err
@@ -111,7 +109,6 @@ func (db *DB) UpdateFilterRule(ctx context.Context, rule *models.FilterRule) err
 				match_all = :match_all,
 				action = :action,
 				stop_processing = :stop_processing,
-				updated_by_user_id = :updated_by_user_id,
 				update_datetime = CURRENT_TIMESTAMP
 			WHERE id = :id AND mailbox_id = :mailbox_id
 		`, rule)
