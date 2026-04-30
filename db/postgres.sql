@@ -267,6 +267,40 @@ CREATE TABLE public.mailbox_block_rule (
 
 
 --
+-- Name: mailbox_filter_condition; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.mailbox_filter_condition (
+    id uuid DEFAULT uuidv7() NOT NULL,
+    rule_id uuid NOT NULL,
+    field text NOT NULL,
+    operator text NOT NULL,
+    value text,
+    create_datetime timestamp with time zone DEFAULT CURRENT_TIMESTAMP
+);
+
+
+--
+-- Name: mailbox_filter_rule; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.mailbox_filter_rule (
+    id uuid DEFAULT uuidv7() NOT NULL,
+    mailbox_id uuid NOT NULL,
+    name text NOT NULL,
+    priority integer DEFAULT 0 NOT NULL,
+    is_active boolean DEFAULT true,
+    match_all boolean DEFAULT true,
+    action text NOT NULL,
+    stop_processing boolean DEFAULT true,
+    created_by_user_id uuid,
+    updated_by_user_id uuid,
+    create_datetime timestamp with time zone DEFAULT CURRENT_TIMESTAMP,
+    update_datetime timestamp with time zone DEFAULT CURRENT_TIMESTAMP
+);
+
+
+--
 -- Name: mailbox_user; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -480,6 +514,22 @@ ALTER TABLE ONLY public.mailbox_block_rule
 
 
 --
+-- Name: mailbox_filter_condition mailbox_filter_condition_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.mailbox_filter_condition
+    ADD CONSTRAINT mailbox_filter_condition_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: mailbox_filter_rule mailbox_filter_rule_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.mailbox_filter_rule
+    ADD CONSTRAINT mailbox_filter_rule_pkey PRIMARY KEY (id);
+
+
+--
 -- Name: mailbox mailbox_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -687,6 +737,27 @@ CREATE INDEX idx_email_user_id ON public.email USING btree (user_id);
 
 
 --
+-- Name: idx_filter_condition_rule_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_filter_condition_rule_id ON public.mailbox_filter_condition USING btree (rule_id);
+
+
+--
+-- Name: idx_filter_rule_mailbox_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_filter_rule_mailbox_id ON public.mailbox_filter_rule USING btree (mailbox_id);
+
+
+--
+-- Name: idx_filter_rule_priority; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_filter_rule_priority ON public.mailbox_filter_rule USING btree (mailbox_id, priority);
+
+
+--
 -- Name: idx_greylist_lookup; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -883,6 +954,38 @@ ALTER TABLE ONLY public.mailbox_block_rule
 
 
 --
+-- Name: mailbox_filter_condition mailbox_filter_condition_rule_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.mailbox_filter_condition
+    ADD CONSTRAINT mailbox_filter_condition_rule_id_fkey FOREIGN KEY (rule_id) REFERENCES public.mailbox_filter_rule(id) ON DELETE CASCADE;
+
+
+--
+-- Name: mailbox_filter_rule mailbox_filter_rule_created_by_user_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.mailbox_filter_rule
+    ADD CONSTRAINT mailbox_filter_rule_created_by_user_id_fkey FOREIGN KEY (created_by_user_id) REFERENCES public."user"(id) ON DELETE SET NULL;
+
+
+--
+-- Name: mailbox_filter_rule mailbox_filter_rule_mailbox_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.mailbox_filter_rule
+    ADD CONSTRAINT mailbox_filter_rule_mailbox_id_fkey FOREIGN KEY (mailbox_id) REFERENCES public.mailbox(id) ON DELETE CASCADE;
+
+
+--
+-- Name: mailbox_filter_rule mailbox_filter_rule_updated_by_user_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.mailbox_filter_rule
+    ADD CONSTRAINT mailbox_filter_rule_updated_by_user_id_fkey FOREIGN KEY (updated_by_user_id) REFERENCES public."user"(id) ON DELETE SET NULL;
+
+
+--
 -- Name: mailbox_user mailbox_user_mailbox_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -959,4 +1062,5 @@ INSERT INTO public.schema_migrations (version) VALUES
     ('20260331000000'),
     ('20260331000001'),
     ('20260401000000'),
-    ('20260405000000');
+    ('20260405000000'),
+    ('20260422000000');
