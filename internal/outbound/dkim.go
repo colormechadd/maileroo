@@ -39,9 +39,11 @@ func (s *DKIMSigner) Sign(domain string, msg []byte) ([]byte, error) {
 	}
 
 	opts := &dkim.SignOptions{
-		Domain:   domain,
-		Selector: ck.selector,
-		Signer:   ck.signer,
+		Domain:                 domain,
+		Selector:               ck.selector,
+		Signer:                 ck.signer,
+		HeaderCanonicalization: dkim.CanonicalizationRelaxed,
+		BodyCanonicalization:   dkim.CanonicalizationRelaxed,
 		HeaderKeys: []string{
 			"From", "To", "Subject", "Date", "Message-ID", "Content-Type", "MIME-Version",
 		},

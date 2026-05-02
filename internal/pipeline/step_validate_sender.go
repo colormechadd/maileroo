@@ -5,6 +5,7 @@ import (
 	"context"
 	"strings"
 
+	"github.com/colormechadd/mailaroo/pkg/models"
 	"github.com/emersion/go-msgauth/dkim"
 	"github.com/emersion/go-msgauth/dmarc"
 	"github.com/zaccone/spf"
@@ -49,7 +50,8 @@ func ValidateSender(ctx context.Context, p *Pipeline, ictx *IngestionContext) (S
 		}
 
 		if dmarcRecord.Policy == dmarc.PolicyReject || dmarcRecord.Policy == dmarc.PolicyQuarantine {
-			return StatusFail, results, nil
+			ictx.FilterAction = models.FilterActionQuarantine
+			return StatusNeutral, results, nil
 		}
 	} else {
 		results["dmarc"] = map[string]any{
@@ -58,7 +60,8 @@ func ValidateSender(ctx context.Context, p *Pipeline, ictx *IngestionContext) (S
 		}
 	}
 
-	return StatusFail, results, nil
+	ictx.FilterAction = models.FilterActionQuarantine
+	return StatusNeutral, results, nil
 }
 
 func checkDKIM(raw []byte) (StepStatus, []any, error) {
