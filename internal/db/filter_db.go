@@ -55,6 +55,46 @@ func (db *DB) ListFilterRules(ctx context.Context, mailboxID uuid.UUID) ([]*mode
 	return db.listFilterRules(ctx, mailboxID, nil)
 }
 
+func (db *DB) GetActiveFilterRulesForMailbox(ctx context.Context, mailboxID uuid.UUID) ([]*models.FilterRule, error) {
+	type ruleRow struct {
+		models.FilterRule
+		ConditionsJSON []byte `db:"conditions"`
+	}
+
+	var rows []ruleRow
+	err := db.SelectContext(ctx, &rows, `
+		SELECT
+			r.id, r.mailbox_id, r.name, r.priority, r.is_active, r.match_all, r.action, r.stop_processing,
+			COALESCE(jsonb_agg(
+				jsonb_build_object(
+					'id', c.id,
+					'rule_id', c.rule_id,
+					'field', c.field,
+					'operator', c.operator,
+					'value', c.value
+				) ORDER BY c.id
+			) FILTER (WHERE c.id IS NOT NULL), '[]') AS conditions
+		FROM mailbox_filter_rule r
+		LEFT JOIN mailbox_filter_condition c ON c.rule_id = r.id
+		WHERE r.mailbox_id = $1 AND r.is_active = TRUE
+		GROUP BY r.id
+		ORDER BY r.priority ASC
+	`, mailboxID)
+	if err != nil {
+		return nil, err
+	}
+
+	rules := make([]*models.FilterRule, len(rows))
+	for i, row := range rows {
+		rule := row.FilterRule
+		if err := json.Unmarshal(row.ConditionsJSON, &rule.Conditions); err != nil {
+			return nil, err
+		}
+		rules[i] = &rule
+	}
+	return rules, nil
+}
+
 func (db *DB) GetFilterRuleByID(ctx context.Context, ruleID, mailboxID uuid.UUID) (*models.FilterRule, error) {
 	rules, err := db.listFilterRules(ctx, mailboxID, &ruleID)
 	if err != nil {
