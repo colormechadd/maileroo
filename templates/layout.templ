@@ -69,11 +69,7 @@ templ Layout(title string, csrfToken string) {
 
 				document.addEventListener('DOMContentLoaded', formatLocalTimes);
 				document.addEventListener('htmx:afterSettle', formatLocalTimes);
-				document.addEventListener('htmx:configRequest', function(e) {
-					const token = document.querySelector('meta[name="csrf-token"]');
-					if (token) e.detail.headers['X-CSRF-Token'] = token.content;
-				});
-				document.addEventListener('htmx:afterSettle', function() {
+document.addEventListener('htmx:afterSettle', function() {
 					const path = window.location.pathname;
 					const params = new URLSearchParams(window.location.search);
 					const mailboxMatch = path.match(/^\/mailbox\/([0-9a-f-]{36})(\/(.+))?/);
@@ -88,7 +84,7 @@ templ Layout(title string, csrfToken string) {
 				});
 			</script>
 		</head>
-		<body class="h-full bg-gray-50 text-gray-900 font-sans antialiased">
+		<body hx-headers={ `{"X-CSRF-Token":"` + csrfToken + `"}` } class="h-full bg-gray-50 text-gray-900 font-sans antialiased">
 			{ children... }
 		</body>
 	</html>

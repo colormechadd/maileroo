@@ -114,6 +114,10 @@ func (s *Server) Routes() http.Handler {
 		csrf.Secure(true),
 		csrf.RequestHeader("X-CSRF-Token"),
 		csrf.FieldName("gorilla.csrf.Token"),
+		csrf.ErrorHandler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			slog.Warn("CSRF token invalid", "method", r.Method, "path", r.URL.Path, "reason", csrf.FailureReason(r))
+			http.Error(w, "Forbidden - CSRF token invalid", http.StatusForbidden)
+		})),
 	)
 
 	r := chi.NewRouter()
@@ -1653,7 +1657,30 @@ func (s *Server) handleFilterRulesList(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	s.render(w, r, user, mailboxes, mailboxID, "filters", nil, templates.FilterRulesList(mailboxID, rules), "Filters")
+	mbUsers, err := s.DB.GetMailboxUsers(r.Context(), mailboxID)
+	if err != nil {
+		slog.Error("failed to list mailbox users", "mailbox_id", mailboxID, "error", err)
+		http.Error(w, "Internal error", http.StatusInternalServerError)
+		return
+	}
+
+	sendingAddresses, err := s.DB.GetSendingAddressesByMailboxID(r.Context(), mailboxID)
+	if err != nil {
+		slog.Error("failed to list sending addresses", "mailbox_id", mailboxID, "error", err)
+		http.Error(w, "Internal error", http.StatusInternalServerError)
+		return
+	}
+
+	var mbName string
+	for _, mb := range mailboxes {
+		if mb.ID == mailboxID {
+			mbName = mb.Name
+			break
+		}
+	}
+
+	counts := s.getCounts(r.Context(), mailboxID, user.ID)
+	s.render(w, r, user, mailboxes, mailboxID, "filters", counts, templates.MailboxConfig(mailboxID, mbName, mbUsers, sendingAddresses, rules), "Configure Mailbox")
 }
 
 func (s *Server) handleFilterRuleNew(w http.ResponseWriter, r *http.Request) {
@@ -1664,7 +1691,8 @@ func (s *Server) handleFilterRuleNew(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	s.render(w, r, user, mailboxes, mailboxID, "filters", nil, templates.FilterRuleForm(mailboxID, nil, csrf.Token(r)), "New Filter")
+	counts := s.getCounts(r.Context(), mailboxID, user.ID)
+	s.render(w, r, user, mailboxes, mailboxID, "filters", counts, templates.FilterRuleForm(mailboxID, nil, csrf.Token(r)), "New Filter")
 }
 
 func (s *Server) handleFilterRuleCreate(w http.ResponseWriter, r *http.Request) {
@@ -1709,7 +1737,8 @@ func (s *Server) handleFilterRuleEdit(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	s.render(w, r, user, mailboxes, mailboxID, "filters", nil, templates.FilterRuleForm(mailboxID, rule, csrf.Token(r)), "Edit Filter")
+	counts := s.getCounts(r.Context(), mailboxID, user.ID)
+	s.render(w, r, user, mailboxes, mailboxID, "filters", counts, templates.FilterRuleForm(mailboxID, rule, csrf.Token(r)), "Edit Filter")
 }
 
 func (s *Server) handleFilterRuleUpdate(w http.ResponseWriter, r *http.Request) {

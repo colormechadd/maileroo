@@ -99,17 +99,6 @@ templ EmailDetail(email *models.Email, attachments []models.EmailAttachment, bod
 								<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 10h4.764a2 2 0 011.789 2.894l-3.5 7A2 2 0 0115.263 21h-4.017c-.163 0-.326-.02-.485-.06L7 20m7-10V5a2 2 0 00-2-2h-.095c-.5 0-.905.405-.905.905 0 .714-.211 1.412-.608 2.006L7 11v9m7-10h-2M7 20H5a2 2 0 01-2-2v-6a2 2 0 012-2h2.5" />
 							</svg>
 						</button>
-					} else if email.Status == models.StatusInbox || email.Status == models.StatusArchived {
-						<button
-							class="text-gray-400 hover:text-red-500 transition-colors cursor-pointer p-2 hover:bg-red-50 rounded-full"
-							hx-post={ "/email/" + email.ID.String() + "/mark-spam" }
-							hx-target="#main-content"
-							title="Mark as Spam"
-						>
-							<svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-								<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" />
-							</svg>
-						</button>
 					}
 
 					<button 
@@ -189,6 +178,13 @@ templ EmailDetail(email *models.Email, attachments []models.EmailAttachment, bod
 									class="px-3 py-1 text-xs font-medium text-purple-700 border border-purple-300 rounded-lg hover:bg-purple-50 transition-colors"
 								>Unsubscribe</a>
 							}
+						}
+						if email.Status == models.StatusInbox || email.Status == models.StatusArchived {
+							<button
+								class="px-3 py-1 text-xs font-medium text-red-600 border border-red-300 rounded-lg hover:bg-red-50 transition-colors cursor-pointer"
+								hx-post={ "/email/" + email.ID.String() + "/mark-spam" }
+								hx-target="#main-content"
+							>Mark as Spam</button>
 						}
 						<button
 							class="px-3 py-1 text-xs font-medium text-red-600 border border-red-300 rounded-lg hover:bg-red-50 transition-colors cursor-pointer"

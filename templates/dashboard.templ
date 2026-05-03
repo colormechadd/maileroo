@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"github.com/colormechadd/mailaroo/pkg/models"
 	"github.com/google/uuid"
+	"golang.org/x/text/language"
+	"golang.org/x/text/message"
 	"net/url"
 	"sort"
 	"strings"
@@ -14,6 +16,12 @@ import (
 func encodeCursor(t time.Time, id uuid.UUID) string {
 	raw := t.UTC().Format(time.RFC3339Nano) + "|" + id.String()
 	return base64.URLEncoding.EncodeToString([]byte(raw))
+}
+
+var pEn = message.NewPrinter(language.English)
+
+func formatCount(n int) string {
+	return pEn.Sprintf("%d", n)
 }
 
 func sortMailboxes(mbs []models.Mailbox) []models.Mailbox {
@@ -125,7 +133,7 @@ templ SidebarFilterLink(mailboxID uuid.UUID, filterName string, label string, ic
 			<span class={ "inline-flex items-center justify-center px-2 py-0.5 rounded-full text-[10px] font-bold",
 				templ.KV("bg-purple-600 text-white", isBadgePurple),
 				templ.KV("bg-gray-100 text-gray-600", !isBadgePurple) }>
-				{ fmt.Sprintf("%d", count) }
+				{ formatCount(count) }
 			</span>
 		}
 	</a>
@@ -184,54 +192,50 @@ templ Dashboard(user *models.User, mailboxes []models.Mailbox, currentMailboxID 
 					<!-- Mailboxes Section -->
 					for _, mb := range sortMailboxes(mailboxes) {
 						<div class="space-y-1">
-							<button
-								hx-get={ "/mailbox/" + mb.ID.String() }
-								hx-target="#main-content"
-								hx-push-url="true"
-								x-on:click={ "currentMailboxID = '" + mb.ID.String() + "'; filter = 'all'" }
-								class="w-full flex items-center px-4 py-2 text-xs font-bold uppercase tracking-widest transition-colors cursor-pointer group"
-								:class={ fmt.Sprintf("currentMailboxID === '%s' ? 'text-purple-700' : 'text-gray-400 hover:text-gray-600'", mb.ID.String()) }
-							>
-								<svg class="mr-3 h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-									<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
-								</svg>
-								{ mb.Name }
-							</button>
-
-								<div class="pl-4 space-y-1" x-show={ "currentMailboxID === '" + mb.ID.String() + "'" } x-cloak>
-									@SidebarFilterLink(mb.ID, "all", "All", IconAll(), 0, currentMailboxID == mb.ID && filter == "all", true)
-									@SidebarFilterLink(mb.ID, "unread", "Unread", IconUnread(), counts["unread"], currentMailboxID == mb.ID && filter == "unread", true)
-									@SidebarFilterLink(mb.ID, "read", "Read", IconRead(), 0, currentMailboxID == mb.ID && filter == "read", true)
-									@SidebarFilterLink(mb.ID, "starred", "Starred", IconStarred(), 0, currentMailboxID == mb.ID && filter == "starred", true)
-									@SidebarFilterLink(mb.ID, "sent", "Sent", IconSent(), 0, currentMailboxID == mb.ID && filter == "sent", true)
-									@SidebarFilterLink(mb.ID, "quarantined", "Quarantined", IconQuarantined(), 0, currentMailboxID == mb.ID && filter == "quarantined", true)
-									@SidebarFilterLink(mb.ID, "deleted", "Trash", IconTrash(), 0, currentMailboxID == mb.ID && filter == "deleted", true)
-									if mb.ID == currentMailboxID {
-										@SidebarFilterLink(mb.ID, "drafts", "Drafts", IconDrafts(), draftCount, filter == "drafts", true)
-									} else {
-										@SidebarFilterLink(mb.ID, "drafts", "Drafts", IconDrafts(), 0, false, true)
-									}
-									<a
-										href={ templ.URL("/mailbox/" + mb.ID.String() + "/filters") }
-										hx-get={ "/mailbox/" + mb.ID.String() + "/filters" }
-										hx-target="#main-content"
-										hx-push-url="true"
-										x-on:click={ "filter = 'filters'; currentMailboxID = '" + mb.ID.String() + "'" }
-										class="flex items-center gap-3 px-4 py-2 text-sm font-medium rounded-lg transition-colors cursor-pointer group"
-										:class={ fmt.Sprintf("currentMailboxID === '%s' && filter === 'filters' ? 'bg-purple-100 text-purple-900' : 'text-gray-500 hover:text-purple-600 hover:bg-purple-50/50'", mb.ID.String()) }
-									>
-										<div
-											class="h-5 w-5"
-											:class={ fmt.Sprintf("currentMailboxID === '%s' && filter === 'filters' ? 'text-purple-600' : 'text-gray-400 group-hover:text-purple-500'", mb.ID.String()) }
-										>
-											<svg fill="none" viewBox="0 0 24 24" stroke="currentColor">
-												<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2a1 1 0 01-.293.707L13 13.414V19a1 1 0 01-.553.894l-4 2A1 1 0 017 21v-7.586L3.293 6.707A1 1 0 013 6V4z"/>
-											</svg>
-										</div>
-										<span>Filters</span>
-									</a>
-								</div>
+							<div class="flex items-center justify-between px-4 py-2">
+								<button
+									hx-get={ "/mailbox/" + mb.ID.String() + "?filter=unread" }
+									hx-target="#main-content"
+									hx-push-url="true"
+									x-on:click={ "currentMailboxID = '" + mb.ID.String() + "'; filter = 'unread'" }
+									class="flex items-center gap-2 text-xs font-bold uppercase tracking-widest transition-colors cursor-pointer group min-w-0"
+									:class={ fmt.Sprintf("currentMailboxID === '%s' ? 'text-purple-700' : 'text-gray-400 hover:text-gray-600'", mb.ID.String()) }
+								>
+									<svg class="h-4 w-4 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+										<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
+									</svg>
+									<span class="truncate">{ mb.Name }</span>
+								</button>
+								<a
+									href={ templ.URL("/mailbox/" + mb.ID.String() + "/filters") }
+									hx-get={ "/mailbox/" + mb.ID.String() + "/filters" }
+									hx-target="#main-content"
+									hx-push-url="true"
+									x-on:click={ "filter = 'filters'; currentMailboxID = '" + mb.ID.String() + "'" }
+									class="p-1 rounded-md transition-colors flex-shrink-0"
+									:class={ fmt.Sprintf("currentMailboxID === '%s' && filter === 'filters' ? 'text-purple-600 bg-purple-50' : 'text-gray-300 hover:text-gray-500 hover:bg-gray-50'", mb.ID.String()) }
+									title="Configure mailbox"
+								>
+									@IconGear()
+								</a>
 							</div>
+
+							<div class="pl-4 space-y-1" x-show={ "currentMailboxID === '" + mb.ID.String() + "'" } x-cloak>
+								@SidebarFilterLink(mb.ID, "unread", "Unread", IconUnread(), counts["unread"], currentMailboxID == mb.ID && filter == "unread", true)
+								@SidebarFilterLink(mb.ID, "read", "Read", IconRead(), 0, currentMailboxID == mb.ID && filter == "read", true)
+								@SidebarFilterLink(mb.ID, "starred", "Starred", IconStarred(), 0, currentMailboxID == mb.ID && filter == "starred", true)
+								<div class="my-1 mx-2 border-t border-gray-100"></div>
+								@SidebarFilterLink(mb.ID, "sent", "Sent", IconSent(), 0, currentMailboxID == mb.ID && filter == "sent", true)
+								if mb.ID == currentMailboxID {
+									@SidebarFilterLink(mb.ID, "drafts", "Drafts", IconDrafts(), draftCount, filter == "drafts", true)
+								} else {
+									@SidebarFilterLink(mb.ID, "drafts", "Drafts", IconDrafts(), 0, false, true)
+								}
+								<div class="my-1 mx-2 border-t border-gray-100"></div>
+								@SidebarFilterLink(mb.ID, "deleted", "Trash", IconTrash(), 0, currentMailboxID == mb.ID && filter == "deleted", true)
+								@SidebarFilterLink(mb.ID, "quarantined", "Quarantined", IconQuarantined(), 0, currentMailboxID == mb.ID && filter == "quarantined", true)
+							</div>
+						</div>
 					}
 				</nav>
 				</div>

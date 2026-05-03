@@ -54,6 +54,9 @@ type WebDB interface {
 
 	CreateBlockRule(ctx context.Context, mailboxID uuid.UUID, addressPattern string) error
 
+	GetMailboxUsers(ctx context.Context, mailboxID uuid.UUID) ([]models.User, error)
+	GetSendingAddressesByMailboxID(ctx context.Context, mailboxID uuid.UUID) ([]models.SendingAddress, error)
+
 	ListFilterRules(ctx context.Context, mailboxID uuid.UUID) ([]*models.FilterRule, error)
 	GetFilterRuleByID(ctx context.Context, ruleID, mailboxID uuid.UUID) (*models.FilterRule, error)
 	CreateFilterRule(ctx context.Context, rule *models.FilterRule) error
@@ -299,6 +302,29 @@ func (db *DB) GetSendingAddressByID(ctx context.Context, id, userID uuid.UUID) (
 func (db *DB) UpdateSendingAddressDisplayName(ctx context.Context, id, userID uuid.UUID, displayName string) error {
 	_, err := db.ExecContext(ctx, "UPDATE sending_address SET display_name = $1 WHERE id = $2 AND user_id = $3", displayName, id, userID)
 	return err
+}
+
+func (db *DB) GetMailboxUsers(ctx context.Context, mailboxID uuid.UUID) ([]models.User, error) {
+	var users []models.User
+	err := db.SelectContext(ctx, &users, `
+		SELECT u.id, u.username, u.password_hash, u.is_active
+		FROM "user" u
+		JOIN mailbox_user mu ON mu.user_id = u.id
+		WHERE mu.mailbox_id = $1 AND mu.is_active = TRUE
+		ORDER BY u.username ASC
+	`, mailboxID)
+	return users, err
+}
+
+func (db *DB) GetSendingAddressesByMailboxID(ctx context.Context, mailboxID uuid.UUID) ([]models.SendingAddress, error) {
+	var addresses []models.SendingAddress
+	err := db.SelectContext(ctx, &addresses, `
+		SELECT id, user_id, mailbox_id, address, display_name, is_active
+		FROM sending_address
+		WHERE mailbox_id = $1 AND is_active = TRUE
+		ORDER BY address ASC
+	`, mailboxID)
+	return addresses, err
 }
 
 func (db *DB) SearchEmailsByMailboxID(ctx context.Context, mailboxID, userID uuid.UUID, query string, limit int, cursorTime *time.Time, cursorID *uuid.UUID) ([]models.Email, error) {

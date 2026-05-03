@@ -232,201 +232,202 @@ func EmailDetail(email *models.Email, attachments []models.EmailAttachment, body
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-		} else if email.Status == models.StatusInbox || email.Status == models.StatusArchived {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 19, "<button class=\"text-gray-400 hover:text-red-500 transition-colors cursor-pointer p-2 hover:bg-red-50 rounded-full\" hx-post=\"")
-			if templ_7745c5c3_Err != nil {
-				return templ_7745c5c3_Err
-			}
-			var templ_7745c5c3_Var15 string
-			templ_7745c5c3_Var15, templ_7745c5c3_Err = templ.JoinStringErrs("/email/" + email.ID.String() + "/mark-spam")
-			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `templates/email_view.templ`, Line: 105, Col: 61}
-			}
-			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var15))
-			if templ_7745c5c3_Err != nil {
-				return templ_7745c5c3_Err
-			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 20, "\" hx-target=\"#main-content\" title=\"Mark as Spam\"><svg class=\"h-6 w-6\" fill=\"none\" viewBox=\"0 0 24 24\" stroke=\"currentColor\"><path stroke-linecap=\"round\" stroke-linejoin=\"round\" stroke-width=\"2\" d=\"M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636\"></path></svg></button> ")
-			if templ_7745c5c3_Err != nil {
-				return templ_7745c5c3_Err
-			}
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 21, "<button class=\"text-gray-400 hover:text-purple-600 transition-colors cursor-pointer p-2 hover:bg-purple-50 rounded-full\" hx-get=\"")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 19, "<button class=\"text-gray-400 hover:text-purple-600 transition-colors cursor-pointer p-2 hover:bg-purple-50 rounded-full\" hx-get=\"")
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		var templ_7745c5c3_Var15 string
+		templ_7745c5c3_Var15, templ_7745c5c3_Err = templ.JoinStringErrs("/email/" + email.ID.String() + "/headers")
+		if templ_7745c5c3_Err != nil {
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `templates/email_view.templ`, Line: 106, Col: 57}
+		}
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var15))
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 20, "\" hx-target=\"#main-content\" hx-push-url=\"true\" title=\"View Headers\"><svg class=\"h-6 w-6\" fill=\"none\" viewBox=\"0 0 24 24\" stroke=\"currentColor\"><path stroke-linecap=\"round\" stroke-linejoin=\"round\" stroke-width=\"2\" d=\"M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z\"></path></svg></button> <button class=\"text-gray-400 hover:text-purple-600 transition-colors cursor-pointer p-2 hover:bg-purple-50 rounded-full\" hx-get=\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var16 string
-		templ_7745c5c3_Var16, templ_7745c5c3_Err = templ.JoinStringErrs("/email/" + email.ID.String() + "/headers")
+		templ_7745c5c3_Var16, templ_7745c5c3_Err = templ.JoinStringErrs("/email/" + email.ID.String() + "/pipeline")
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `templates/email_view.templ`, Line: 117, Col: 57}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `templates/email_view.templ`, Line: 118, Col: 58}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var16))
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 22, "\" hx-target=\"#main-content\" hx-push-url=\"true\" title=\"View Headers\"><svg class=\"h-6 w-6\" fill=\"none\" viewBox=\"0 0 24 24\" stroke=\"currentColor\"><path stroke-linecap=\"round\" stroke-linejoin=\"round\" stroke-width=\"2\" d=\"M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z\"></path></svg></button> <button class=\"text-gray-400 hover:text-purple-600 transition-colors cursor-pointer p-2 hover:bg-purple-50 rounded-full\" hx-get=\"")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 21, "\" hx-target=\"#main-content\" hx-push-url=\"true\" title=\"Ingestion Pipeline\"><svg class=\"h-6 w-6\" fill=\"none\" viewBox=\"0 0 24 24\" stroke=\"currentColor\"><path stroke-linecap=\"round\" stroke-linejoin=\"round\" stroke-width=\"2\" d=\"M13 10V3L4 14h7v7l9-11h-7z\"></path></svg></button> <button class=\"text-gray-400 hover:text-purple-600 transition-colors cursor-pointer p-2 hover:bg-purple-50 rounded-full\" hx-get=\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var17 string
-		templ_7745c5c3_Var17, templ_7745c5c3_Err = templ.JoinStringErrs("/email/" + email.ID.String() + "/pipeline")
+		templ_7745c5c3_Var17, templ_7745c5c3_Err = templ.JoinStringErrs("/mailbox/" + email.MailboxID.String())
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `templates/email_view.templ`, Line: 129, Col: 58}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `templates/email_view.templ`, Line: 128, Col: 173}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var17))
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 23, "\" hx-target=\"#main-content\" hx-push-url=\"true\" title=\"Ingestion Pipeline\"><svg class=\"h-6 w-6\" fill=\"none\" viewBox=\"0 0 24 24\" stroke=\"currentColor\"><path stroke-linecap=\"round\" stroke-linejoin=\"round\" stroke-width=\"2\" d=\"M13 10V3L4 14h7v7l9-11h-7z\"></path></svg></button> <button class=\"text-gray-400 hover:text-purple-600 transition-colors cursor-pointer p-2 hover:bg-purple-50 rounded-full\" hx-get=\"")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 22, "\" hx-target=\"#main-content\" hx-push-url=\"true\" title=\"Close\"><svg class=\"h-6 w-6\" fill=\"none\" viewBox=\"0 0 24 24\" stroke=\"currentColor\"><path stroke-linecap=\"round\" stroke-linejoin=\"round\" stroke-width=\"2\" d=\"M6 18L18 6M6 6l12 12\"></path></svg></button></div></div><div class=\"flex items-start justify-between\"><div class=\"flex items-center\"><div class=\"h-12 w-12 rounded-full bg-teal-500 flex items-center justify-center text-white font-bold text-lg shadow-sm mr-4\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var18 string
-		templ_7745c5c3_Var18, templ_7745c5c3_Err = templ.JoinStringErrs("/mailbox/" + email.MailboxID.String())
+		templ_7745c5c3_Var18, templ_7745c5c3_Err = templ.JoinStringErrs(getInitials(email.FromAddress))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `templates/email_view.templ`, Line: 139, Col: 173}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `templates/email_view.templ`, Line: 139, Col: 38}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var18))
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 24, "\" hx-target=\"#main-content\" hx-push-url=\"true\" title=\"Close\"><svg class=\"h-6 w-6\" fill=\"none\" viewBox=\"0 0 24 24\" stroke=\"currentColor\"><path stroke-linecap=\"round\" stroke-linejoin=\"round\" stroke-width=\"2\" d=\"M6 18L18 6M6 6l12 12\"></path></svg></button></div></div><div class=\"flex items-start justify-between\"><div class=\"flex items-center\"><div class=\"h-12 w-12 rounded-full bg-teal-500 flex items-center justify-center text-white font-bold text-lg shadow-sm mr-4\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 23, "</div><div><div class=\"flex items-center space-x-2\"><p class=\"font-bold text-gray-900\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var19 string
-		templ_7745c5c3_Var19, templ_7745c5c3_Err = templ.JoinStringErrs(getInitials(email.FromAddress))
+		templ_7745c5c3_Var19, templ_7745c5c3_Err = templ.JoinStringErrs(email.FromAddress)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `templates/email_view.templ`, Line: 150, Col: 38}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `templates/email_view.templ`, Line: 143, Col: 61}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var19))
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 25, "</div><div><div class=\"flex items-center space-x-2\"><p class=\"font-bold text-gray-900\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 24, "</p><button type=\"button\" hx-post=\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var20 string
-		templ_7745c5c3_Var20, templ_7745c5c3_Err = templ.JoinStringErrs(email.FromAddress)
+		templ_7745c5c3_Var20, templ_7745c5c3_Err = templ.JoinStringErrs("/email/" + email.ID.String() + "/add-contact")
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `templates/email_view.templ`, Line: 154, Col: 61}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `templates/email_view.templ`, Line: 146, Col: 64}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var20))
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 26, "</p><button type=\"button\" hx-post=\"")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 25, "\" hx-target=\"#main-content\" hx-push-url=\"/contacts\" title=\"Add to Contacts\" class=\"text-xs text-purple-400 hover:text-purple-600 font-medium transition-colors cursor-pointer\">+ Add to Contacts</button></div><p class=\"text-gray-500 text-sm\">to ")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var21 string
-		templ_7745c5c3_Var21, templ_7745c5c3_Err = templ.JoinStringErrs("/email/" + email.ID.String() + "/add-contact")
+		templ_7745c5c3_Var21, templ_7745c5c3_Err = templ.JoinStringErrs(email.ToAddress)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `templates/email_view.templ`, Line: 157, Col: 64}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `templates/email_view.templ`, Line: 153, Col: 59}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var21))
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 27, "\" hx-target=\"#main-content\" hx-push-url=\"/contacts\" title=\"Add to Contacts\" class=\"text-xs text-purple-400 hover:text-purple-600 font-medium transition-colors cursor-pointer\">+ Add to Contacts</button></div><p class=\"text-gray-500 text-sm\">to ")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 26, "</p></div></div><div class=\"text-right\"><p class=\"text-gray-500 text-sm font-medium\" data-local-time=\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var22 string
-		templ_7745c5c3_Var22, templ_7745c5c3_Err = templ.JoinStringErrs(email.ToAddress)
+		templ_7745c5c3_Var22, templ_7745c5c3_Err = templ.JoinStringErrs(email.ReceiveDatetime.Format(time.RFC3339))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `templates/email_view.templ`, Line: 164, Col: 59}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `templates/email_view.templ`, Line: 157, Col: 110}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var22))
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 28, "</p></div></div><div class=\"text-right\"><p class=\"text-gray-500 text-sm font-medium\" data-local-time=\"")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 27, "\" data-format=\"full\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var23 string
-		templ_7745c5c3_Var23, templ_7745c5c3_Err = templ.JoinStringErrs(email.ReceiveDatetime.Format(time.RFC3339))
+		templ_7745c5c3_Var23, templ_7745c5c3_Err = templ.JoinStringErrs(email.ReceiveDatetime.Format("Jan 02, 2006, 15:04"))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `templates/email_view.templ`, Line: 168, Col: 110}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `templates/email_view.templ`, Line: 158, Col: 59}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var23))
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 29, "\" data-format=\"full\">")
-		if templ_7745c5c3_Err != nil {
-			return templ_7745c5c3_Err
-		}
-		var templ_7745c5c3_Var24 string
-		templ_7745c5c3_Var24, templ_7745c5c3_Err = templ.JoinStringErrs(email.ReceiveDatetime.Format("Jan 02, 2006, 15:04"))
-		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `templates/email_view.templ`, Line: 169, Col: 59}
-		}
-		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var24))
-		if templ_7745c5c3_Err != nil {
-			return templ_7745c5c3_Err
-		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 30, "</p><div class=\"mt-2 flex items-center justify-end gap-2\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 28, "</p><div class=\"mt-2 flex items-center justify-end gap-2\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		if unsubInfo != nil {
 			if unsubInfo.OneClick && unsubInfo.URL != "" {
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 31, "<button class=\"px-3 py-1 text-xs font-medium text-purple-700 border border-purple-300 rounded-lg hover:bg-purple-50 transition-colors cursor-pointer\" hx-post=\"")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 29, "<button class=\"px-3 py-1 text-xs font-medium text-purple-700 border border-purple-300 rounded-lg hover:bg-purple-50 transition-colors cursor-pointer\" hx-post=\"")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
-				var templ_7745c5c3_Var25 string
-				templ_7745c5c3_Var25, templ_7745c5c3_Err = templ.JoinStringErrs("/email/" + email.ID.String() + "/unsubscribe")
+				var templ_7745c5c3_Var24 string
+				templ_7745c5c3_Var24, templ_7745c5c3_Err = templ.JoinStringErrs("/email/" + email.ID.String() + "/unsubscribe")
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `templates/email_view.templ`, Line: 176, Col: 65}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `templates/email_view.templ`, Line: 165, Col: 65}
+				}
+				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var24))
+				if templ_7745c5c3_Err != nil {
+					return templ_7745c5c3_Err
+				}
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 30, "\" hx-swap=\"none\">Unsubscribe</button> ")
+				if templ_7745c5c3_Err != nil {
+					return templ_7745c5c3_Err
+				}
+			} else if unsubInfo.URL != "" {
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 31, "<a href=\"")
+				if templ_7745c5c3_Err != nil {
+					return templ_7745c5c3_Err
+				}
+				var templ_7745c5c3_Var25 templ.SafeURL
+				templ_7745c5c3_Var25, templ_7745c5c3_Err = templ.JoinURLErrs(templ.URL(unsubInfo.URL))
+				if templ_7745c5c3_Err != nil {
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `templates/email_view.templ`, Line: 170, Col: 40}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var25))
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 32, "\" hx-swap=\"none\">Unsubscribe</button> ")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 32, "\" target=\"_blank\" rel=\"noopener noreferrer\" class=\"px-3 py-1 text-xs font-medium text-purple-700 border border-purple-300 rounded-lg hover:bg-purple-50 transition-colors\">Unsubscribe</a> ")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
-			} else if unsubInfo.URL != "" {
+			} else if unsubInfo.Mailto != "" {
 				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 33, "<a href=\"")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
 				var templ_7745c5c3_Var26 templ.SafeURL
-				templ_7745c5c3_Var26, templ_7745c5c3_Err = templ.JoinURLErrs(templ.URL(unsubInfo.URL))
+				templ_7745c5c3_Var26, templ_7745c5c3_Err = templ.JoinURLErrs(templ.URL(unsubInfo.Mailto))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `templates/email_view.templ`, Line: 181, Col: 40}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `templates/email_view.templ`, Line: 177, Col: 43}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var26))
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 34, "\" target=\"_blank\" rel=\"noopener noreferrer\" class=\"px-3 py-1 text-xs font-medium text-purple-700 border border-purple-300 rounded-lg hover:bg-purple-50 transition-colors\">Unsubscribe</a> ")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 34, "\" class=\"px-3 py-1 text-xs font-medium text-purple-700 border border-purple-300 rounded-lg hover:bg-purple-50 transition-colors\">Unsubscribe</a> ")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
-			} else if unsubInfo.Mailto != "" {
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 35, "<a href=\"")
-				if templ_7745c5c3_Err != nil {
-					return templ_7745c5c3_Err
-				}
-				var templ_7745c5c3_Var27 templ.SafeURL
-				templ_7745c5c3_Var27, templ_7745c5c3_Err = templ.JoinURLErrs(templ.URL(unsubInfo.Mailto))
-				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `templates/email_view.templ`, Line: 188, Col: 43}
-				}
-				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var27))
-				if templ_7745c5c3_Err != nil {
-					return templ_7745c5c3_Err
-				}
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 36, "\" class=\"px-3 py-1 text-xs font-medium text-purple-700 border border-purple-300 rounded-lg hover:bg-purple-50 transition-colors\">Unsubscribe</a> ")
-				if templ_7745c5c3_Err != nil {
-					return templ_7745c5c3_Err
-				}
+			}
+		}
+		if email.Status == models.StatusInbox || email.Status == models.StatusArchived {
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 35, "<button class=\"px-3 py-1 text-xs font-medium text-red-600 border border-red-300 rounded-lg hover:bg-red-50 transition-colors cursor-pointer\" hx-post=\"")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			var templ_7745c5c3_Var27 string
+			templ_7745c5c3_Var27, templ_7745c5c3_Err = templ.JoinStringErrs("/email/" + email.ID.String() + "/mark-spam")
+			if templ_7745c5c3_Err != nil {
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `templates/email_view.templ`, Line: 185, Col: 62}
+			}
+			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var27))
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 36, "\" hx-target=\"#main-content\">Mark as Spam</button> ")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
 			}
 		}
 		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 37, "<button class=\"px-3 py-1 text-xs font-medium text-red-600 border border-red-300 rounded-lg hover:bg-red-50 transition-colors cursor-pointer\" hx-post=\"")
@@ -436,7 +437,7 @@ func EmailDetail(email *models.Email, attachments []models.EmailAttachment, body
 		var templ_7745c5c3_Var28 string
 		templ_7745c5c3_Var28, templ_7745c5c3_Err = templ.JoinStringErrs("/email/" + email.ID.String() + "/block")
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `templates/email_view.templ`, Line: 195, Col: 57}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `templates/email_view.templ`, Line: 191, Col: 57}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var28))
 		if templ_7745c5c3_Err != nil {
@@ -449,7 +450,7 @@ func EmailDetail(email *models.Email, attachments []models.EmailAttachment, body
 		var templ_7745c5c3_Var29 string
 		templ_7745c5c3_Var29, templ_7745c5c3_Err = templ.JoinStringErrs("Block all future emails from " + email.FromAddress + "?")
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `templates/email_view.templ`, Line: 197, Col: 77}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `templates/email_view.templ`, Line: 193, Col: 77}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var29))
 		if templ_7745c5c3_Err != nil {
@@ -480,7 +481,7 @@ func EmailDetail(email *models.Email, attachments []models.EmailAttachment, body
 			var templ_7745c5c3_Var30 string
 			templ_7745c5c3_Var30, templ_7745c5c3_Err = templ.JoinStringErrs(body)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `templates/email_view.templ`, Line: 218, Col: 11}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `templates/email_view.templ`, Line: 214, Col: 11}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var30))
 			if templ_7745c5c3_Err != nil {
@@ -503,7 +504,7 @@ func EmailDetail(email *models.Email, attachments []models.EmailAttachment, body
 			var templ_7745c5c3_Var31 string
 			templ_7745c5c3_Var31, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf("%d", len(attachments)))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `templates/email_view.templ`, Line: 225, Col: 129}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `templates/email_view.templ`, Line: 221, Col: 129}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var31))
 			if templ_7745c5c3_Err != nil {
@@ -521,7 +522,7 @@ func EmailDetail(email *models.Email, attachments []models.EmailAttachment, body
 				var templ_7745c5c3_Var32 templ.SafeURL
 				templ_7745c5c3_Var32, templ_7745c5c3_Err = templ.JoinURLErrs(templ.URL("/attachment/" + att.ID.String()))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `templates/email_view.templ`, Line: 229, Col: 57}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `templates/email_view.templ`, Line: 225, Col: 57}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var32))
 				if templ_7745c5c3_Err != nil {
@@ -534,7 +535,7 @@ func EmailDetail(email *models.Email, attachments []models.EmailAttachment, body
 				var templ_7745c5c3_Var33 string
 				templ_7745c5c3_Var33, templ_7745c5c3_Err = templ.JoinStringErrs(att.Filename)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `templates/email_view.templ`, Line: 238, Col: 105}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `templates/email_view.templ`, Line: 234, Col: 105}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var33))
 				if templ_7745c5c3_Err != nil {
@@ -547,7 +548,7 @@ func EmailDetail(email *models.Email, attachments []models.EmailAttachment, body
 				var templ_7745c5c3_Var34 string
 				templ_7745c5c3_Var34, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf("%.1f KB", float64(att.Size)/1024))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `templates/email_view.templ`, Line: 239, Col: 101}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `templates/email_view.templ`, Line: 235, Col: 101}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var34))
 				if templ_7745c5c3_Err != nil {
@@ -621,7 +622,7 @@ func EmailListStarButton(emailID uuid.UUID, isStar bool) templ.Component {
 		var templ_7745c5c3_Var38 string
 		templ_7745c5c3_Var38, templ_7745c5c3_Err = templ.JoinStringErrs("/email/" + emailID.String() + "/star?list=1")
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `templates/email_view.templ`, Line: 258, Col: 57}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `templates/email_view.templ`, Line: 254, Col: 57}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var38))
 		if templ_7745c5c3_Err != nil {
@@ -634,7 +635,7 @@ func EmailListStarButton(emailID uuid.UUID, isStar bool) templ.Component {
 		var templ_7745c5c3_Var39 string
 		templ_7745c5c3_Var39, templ_7745c5c3_Err = templ.JoinStringErrs(starTitle)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `templates/email_view.templ`, Line: 262, Col: 19}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `templates/email_view.templ`, Line: 258, Col: 19}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var39))
 		if templ_7745c5c3_Err != nil {
