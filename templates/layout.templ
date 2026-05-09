@@ -69,7 +69,11 @@ templ Layout(title string, csrfToken string) {
 
 				document.addEventListener('DOMContentLoaded', formatLocalTimes);
 				document.addEventListener('htmx:afterSettle', formatLocalTimes);
-document.addEventListener('htmx:afterSettle', function() {
+				document.addEventListener('htmx:configRequest', function(e) {
+					const token = document.querySelector('meta[name="csrf-token"]');
+					if (token) e.detail.headers['X-CSRF-Token'] = token.content;
+				});
+				document.addEventListener('htmx:afterSettle', function() {
 					const path = window.location.pathname;
 					const params = new URLSearchParams(window.location.search);
 					const mailboxMatch = path.match(/^\/mailbox\/([0-9a-f-]{36})(\/(.+))?/);
