@@ -11,7 +11,8 @@ import (
 	"github.com/stretchr/testify/mock"
 )
 
-func strPtr(s string) *string { return &s }
+//go:fix inline
+func strPtr(s string) *string { return new(s) }
 
 func activeRule(action string, conditions ...models.FilterCondition) *models.FilterRule {
 	return &models.FilterRule{
@@ -81,7 +82,7 @@ func TestApplyFilterRules_NoMatch(t *testing.T) {
 	mailboxID := uuid.New()
 
 	rule := activeRule(models.FilterActionArchive,
-		filterCond("subject", "contains", strPtr("newsletter")),
+		filterCond("subject", "contains", new("newsletter")),
 	)
 	mockDB.On("GetActiveFilterRulesForMailbox", mock.Anything, mailboxID).
 		Return([]*models.FilterRule{rule}, nil).Once()
@@ -108,7 +109,7 @@ func TestApplyFilterRules_Match(t *testing.T) {
 	mailboxID := uuid.New()
 
 	rule := activeRule(models.FilterActionArchive,
-		filterCond("subject", "contains", strPtr("Hello")),
+		filterCond("subject", "contains", new("Hello")),
 	)
 	mockDB.On("GetActiveFilterRulesForMailbox", mock.Anything, mailboxID).
 		Return([]*models.FilterRule{rule}, nil).Once()
@@ -139,7 +140,7 @@ func TestApplyFilterRules_MatchFromAddress(t *testing.T) {
 	mailboxID := uuid.New()
 
 	rule := activeRule(models.FilterActionDelete,
-		filterCond("from", "contains", strPtr("spam")),
+		filterCond("from", "contains", new("spam")),
 	)
 	mockDB.On("GetActiveFilterRulesForMailbox", mock.Anything, mailboxID).
 		Return([]*models.FilterRule{rule}, nil).Once()

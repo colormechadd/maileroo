@@ -429,7 +429,7 @@ func (s *Service) FetchUnsubscribeInfo(ctx context.Context, email *models.Email)
 		OneClick: strings.Contains(mr.Header.Get("List-Unsubscribe-Post"), "List-Unsubscribe=One-Click"),
 	}
 
-	for _, part := range strings.Split(listUnsub, ",") {
+	for part := range strings.SplitSeq(listUnsub, ",") {
 		part = strings.TrimSpace(part)
 		if strings.HasPrefix(part, "<") && strings.HasSuffix(part, ">") {
 			u := part[1 : len(part)-1]

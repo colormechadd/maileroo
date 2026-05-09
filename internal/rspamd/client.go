@@ -36,8 +36,8 @@ func NewClient(addr string) *Client {
 		httpClient *http.Client
 	)
 
-	if strings.HasPrefix(addr, "unix://") {
-		socketPath := strings.TrimPrefix(addr, "unix://")
+	if after, ok := strings.CutPrefix(addr, "unix://"); ok {
+		socketPath := after
 		transport := &http.Transport{
 			DialContext: func(ctx context.Context, _, _ string) (net.Conn, error) {
 				return (&net.Dialer{}).DialContext(ctx, "unix", socketPath)

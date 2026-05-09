@@ -49,9 +49,7 @@ func main() {
 	)
 
 	for range workers {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
+		wg.Go(func() {
 			for path := range jobs {
 				fmt.Printf("\n%s\n", path)
 				if err := inject(path, *from, *to, *host, *port, *dryRun); err != nil {
@@ -61,7 +59,7 @@ func main() {
 					ok.Add(1)
 				}
 			}
-		}()
+		})
 	}
 
 	for _, path := range files {
@@ -98,7 +96,7 @@ func inject(path, fromFlag, toFlag, host, port string, dryRun bool) error {
 
 	var recipients []string
 	if toFlag != "" {
-		for _, a := range strings.Split(toFlag, ",") {
+		for a := range strings.SplitSeq(toFlag, ",") {
 			if t := strings.TrimSpace(a); t != "" {
 				recipients = append(recipients, t)
 			}

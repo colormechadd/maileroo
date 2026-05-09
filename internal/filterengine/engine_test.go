@@ -7,7 +7,8 @@ import (
 	"github.com/google/uuid"
 )
 
-func strPtr(s string) *string { return &s }
+//go:fix inline
+func strPtr(s string) *string { return new(s) }
 
 func rule(action string, matchAll bool, stopProcessing bool, conditions ...models.FilterCondition) *models.FilterRule {
 	return &models.FilterRule{
@@ -40,7 +41,7 @@ func TestMatch_NoRules(t *testing.T) {
 func TestMatch_Contains(t *testing.T) {
 	e := &RuleEngine{}
 	r := rule(models.FilterActionArchive, true, true,
-		cond(models.FilterFieldSubject, models.FilterOperatorContains, strPtr("newsletter")),
+		cond(models.FilterFieldSubject, models.FilterOperatorContains, new("newsletter")),
 	)
 	msg := &ParsedMessage{Subject: "Weekly Newsletter"}
 	matched, err := e.Match([]*models.FilterRule{r}, msg)
@@ -55,8 +56,8 @@ func TestMatch_Contains(t *testing.T) {
 func TestMatch_ANDAllMustPass(t *testing.T) {
 	e := &RuleEngine{}
 	r := rule(models.FilterActionDelete, true, true,
-		cond(models.FilterFieldFrom, models.FilterOperatorContains, strPtr("spam")),
-		cond(models.FilterFieldSubject, models.FilterOperatorContains, strPtr("offer")),
+		cond(models.FilterFieldFrom, models.FilterOperatorContains, new("spam")),
+		cond(models.FilterFieldSubject, models.FilterOperatorContains, new("offer")),
 	)
 	msg := &ParsedMessage{From: "spam@example.com", Subject: "no match here"}
 	matched, err := e.Match([]*models.FilterRule{r}, msg)
@@ -71,8 +72,8 @@ func TestMatch_ANDAllMustPass(t *testing.T) {
 func TestMatch_OROneEnough(t *testing.T) {
 	e := &RuleEngine{}
 	r := rule(models.FilterActionStar, false, true,
-		cond(models.FilterFieldFrom, models.FilterOperatorContains, strPtr("boss")),
-		cond(models.FilterFieldSubject, models.FilterOperatorContains, strPtr("urgent")),
+		cond(models.FilterFieldFrom, models.FilterOperatorContains, new("boss")),
+		cond(models.FilterFieldSubject, models.FilterOperatorContains, new("urgent")),
 	)
 	msg := &ParsedMessage{From: "boss@company.com", Subject: "routine update"}
 	matched, err := e.Match([]*models.FilterRule{r}, msg)
@@ -87,7 +88,7 @@ func TestMatch_OROneEnough(t *testing.T) {
 func TestMatch_Regex(t *testing.T) {
 	e := &RuleEngine{}
 	r := rule(models.FilterActionQuarantine, true, true,
-		cond(models.FilterFieldFrom, models.FilterOperatorMatchesRegex, strPtr(`.*@suspicious\.io$`)),
+		cond(models.FilterFieldFrom, models.FilterOperatorMatchesRegex, new(`.*@suspicious\.io$`)),
 	)
 	msg := &ParsedMessage{From: "bad@suspicious.io"}
 	matched, err := e.Match([]*models.FilterRule{r}, msg)
@@ -126,7 +127,7 @@ func TestMatch_HasAttachment(t *testing.T) {
 func TestMatch_InactiveRuleSkipped(t *testing.T) {
 	e := &RuleEngine{}
 	r := rule(models.FilterActionArchive, true, true,
-		cond(models.FilterFieldSubject, models.FilterOperatorContains, strPtr("test")),
+		cond(models.FilterFieldSubject, models.FilterOperatorContains, new("test")),
 	)
 	r.IsActive = false
 	msg := &ParsedMessage{Subject: "test subject"}
