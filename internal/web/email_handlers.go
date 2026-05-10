@@ -9,6 +9,7 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/colormechadd/mailaroo/internal/db"
 	"github.com/colormechadd/mailaroo/pkg/models"
 	"github.com/colormechadd/mailaroo/templates"
 	"github.com/go-chi/chi/v5"
@@ -189,7 +190,8 @@ func (s *Server) handleBulkEmailAction(w http.ResponseWriter, r *http.Request) {
 	}
 	mailboxes, _ := s.DB.GetMailboxesByUserID(r.Context(), user.ID)
 	counts := s.getCounts(r.Context(), mailboxID, user.ID)
-	emails, err := s.DB.GetEmailsByMailboxID(r.Context(), mailboxID, filter, 50, nil, nil)
+	emails, err := s.DB.SearchEmails(r.Context(), mailboxID, user.ID, db.EmailFilter{View: filter}, 50, nil, nil)
+
 	if err != nil {
 		slog.Error("failed to fetch emails after bulk action", "error", err)
 		http.Error(w, "Internal error", http.StatusInternalServerError)

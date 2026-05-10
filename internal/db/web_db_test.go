@@ -137,7 +137,7 @@ func TestWebDB(t *testing.T) {
 
 	t.Run("GetEmailsByMailboxID", func(t *testing.T) {
 		t.Run("default/all returns INBOX emails", func(t *testing.T) {
-			emails, err := db.GetEmailsByMailboxID(ctx, mailboxID, "all", 50, nil, nil)
+			emails, err := db.SearchEmails(ctx, mailboxID, session.UserID, EmailFilter{View: "all"}, 50, nil, nil)
 			assert.NoError(t, err)
 			ids := emailIDs(emails)
 			assert.Contains(t, ids, inboxEmailID)

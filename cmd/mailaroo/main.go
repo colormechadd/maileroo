@@ -193,10 +193,10 @@ func runRateLimitCleaner(ctx context.Context, database *db.DB) {
 				slog.Error("failed to purge expired rate limit data", "error", err)
 			}
 		case <-ctx.Done():
+			slog.Info("Stopped rate limit cleaner")
 			return
 		}
 	}
-	slog.Info("Stopped rate limit cleaner")
 }
 
 func runTrashPurge(ctx context.Context, database *db.DB, store storage.Storage) {
@@ -209,10 +209,10 @@ func runTrashPurge(ctx context.Context, database *db.DB, store storage.Storage) 
 		case <-ticker.C:
 			trashpurge.Run(database, store)
 		case <-ctx.Done():
+			slog.Info("Stopped rate limit cleaner")
 			return
 		}
 	}
-	slog.Info("Stopped rate limit cleaner")
 }
 
 func runWebServer(ctx context.Context, cfg *config.Config, webServer *web.Server) {

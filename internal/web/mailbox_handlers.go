@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/colormechadd/mailaroo/internal/db"
 	"github.com/colormechadd/mailaroo/pkg/models"
 	"github.com/colormechadd/mailaroo/templates"
 	"github.com/go-chi/chi/v5"
@@ -92,7 +93,7 @@ func (s *Server) handleMailboxView(w http.ResponseWriter, r *http.Request) {
 	}
 
 	const pageSize = 50
-	emails, err := s.DB.GetEmailsByMailboxID(r.Context(), mailboxID, filter, pageSize, nil, nil)
+	emails, err := s.DB.SearchEmails(r.Context(), mailboxID, user.ID, db.EmailFilter{View: filter}, pageSize, nil, nil)
 	if err != nil {
 		slog.Error("failed to fetch emails", "mailbox_id", mailboxID, "filter", filter, "error", err)
 		http.Error(w, "Internal error", http.StatusInternalServerError)
@@ -137,7 +138,7 @@ func (s *Server) handleMailboxSearch(w http.ResponseWriter, r *http.Request) {
 	}
 
 	const pageSize = 50
-	emails, err := s.DB.SearchEmailsByMailboxID(r.Context(), mailboxID, user.ID, query, pageSize, nil, nil)
+	emails, err := s.DB.SearchEmails(r.Context(), mailboxID, user.ID, db.EmailFilter{Text: query}, pageSize, nil, nil)
 	if err != nil {
 		slog.Error("search failed", "mailbox_id", mailboxID, "query", query, "error", err)
 		http.Error(w, "Internal error", http.StatusInternalServerError)
@@ -186,7 +187,8 @@ func (s *Server) handleMailboxMore(w http.ResponseWriter, r *http.Request) {
 	}
 
 	const pageSize = 50
-	emails, err := s.DB.GetEmailsByMailboxID(r.Context(), mailboxID, filter, pageSize, cursorTime, cursorID)
+	emails, err := s.DB.SearchEmails(r.Context(), mailboxID, user.ID, db.EmailFilter{View: filter}, pageSize, cursorTime, cursorID)
+
 	if err != nil {
 		slog.Error("failed to fetch emails", "mailbox_id", mailboxID, "filter", filter, "error", err)
 		http.Error(w, "Internal error", http.StatusInternalServerError)
@@ -239,7 +241,7 @@ func (s *Server) handleSearchMore(w http.ResponseWriter, r *http.Request) {
 	}
 
 	const pageSize = 50
-	emails, err := s.DB.SearchEmailsByMailboxID(r.Context(), mailboxID, user.ID, query, pageSize, cursorTime, cursorID)
+	emails, err := s.DB.SearchEmails(r.Context(), mailboxID, user.ID, db.EmailFilter{Text: query}, pageSize, cursorTime, cursorID)
 	if err != nil {
 		slog.Error("search more failed", "mailbox_id", mailboxID, "query", query, "error", err)
 		http.Error(w, "Internal error", http.StatusInternalServerError)
