@@ -46,12 +46,31 @@ func (db *DB) UpdateIngestionStatus(ctx context.Context, id uuid.UUID, status st
 	return err
 }
 
-func (db *DB) CreateBlockRule(ctx context.Context, mailboxID uuid.UUID, addressPattern string) error {
+func (db *DB) CreateBlockRule(ctx context.Context, mailboxID uuid.UUID, userID uuid.UUID, addressPattern string) error {
 	_, err := db.ExecContext(ctx, `
-		INSERT INTO mailbox_block_rule (mailbox_id, address_pattern)
-		VALUES ($1, $2)
+		INSERT INTO mailbox_block_rule (mailbox_id, user_id, address_pattern)
+		VALUES ($1, $2, $3)
 		ON CONFLICT DO NOTHING
-	`, mailboxID, addressPattern)
+	`, mailboxID, userID, addressPattern)
+	return err
+}
+
+func (db *DB) ListBlockRules(ctx context.Context, mailboxID uuid.UUID) ([]*models.MailboxBlockRule, error) {
+	var rules []*models.MailboxBlockRule
+	err := db.SelectContext(ctx, &rules, `
+		SELECT r.id, r.mailbox_id, r.address_pattern, r.is_active, r.user_id, u.username
+		FROM mailbox_block_rule r
+		LEFT JOIN "user" u ON u.id = r.user_id
+		WHERE r.mailbox_id = $1
+		ORDER BY r.create_datetime DESC
+	`, mailboxID)
+	return rules, err
+}
+
+func (db *DB) DeleteBlockRule(ctx context.Context, ruleID, mailboxID uuid.UUID) error {
+	_, err := db.ExecContext(ctx, `
+		DELETE FROM mailbox_block_rule WHERE id = $1 AND mailbox_id = $2
+	`, ruleID, mailboxID)
 	return err
 }
 

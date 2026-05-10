@@ -112,6 +112,23 @@ func getAvatarColor(name string) string {
 	return colors[sum%len(colors)]
 }
 
+func mailboxFilterTitle(filter string) string {
+	switch filter {
+	case "starred":
+		return "Starred"
+	case "sent":
+		return "Sent"
+	case "drafts":
+		return "Drafts"
+	case "deleted":
+		return "Trash"
+	case "quarantined":
+		return "Quarantined"
+	default:
+		return "Mail"
+	}
+}
+
 templ SidebarFilterLink(mailboxID uuid.UUID, filterName string, label string, icon templ.Component, count int, isActive bool, isBadgePurple bool) {
 	{{ activeExpr := fmt.Sprintf("currentMailboxID === '%s' && filter === '%s'", mailboxID.String(), filterName) }}
 	<a
@@ -147,7 +164,7 @@ templ Dashboard(user *models.User, mailboxes []models.Mailbox, currentMailboxID 
 			 hx-ext="sse"
 			 sse-connect="/events"
 			 x-data={ "{ currentMailboxID: '" + currentMailboxID.String() + "', filter: '" + filter + "' }" }
-			 @nav-update.window="currentMailboxID = $event.detail.mailboxID; filter = $event.detail.filter"
+			 @nav-update.window="if ($event.detail.mailboxID !== undefined) currentMailboxID = $event.detail.mailboxID; filter = $event.detail.filter"
 		>
 			<!-- Listen for new-mail and refresh the list if we are in that mailbox -->
 			<div sse-swap="new-mail" hx-get={ "/mailbox/" + currentMailboxID.String() + "?filter=" + filter } hx-target="#main-content" class="hidden"></div>
@@ -194,10 +211,10 @@ templ Dashboard(user *models.User, mailboxes []models.Mailbox, currentMailboxID 
 						<div class="space-y-1">
 							<div class="flex items-center justify-between px-4 py-2">
 								<button
-									hx-get={ "/mailbox/" + mb.ID.String() + "?filter=unread" }
+									hx-get={ "/mailbox/" + mb.ID.String() + "?filter=mail" }
 									hx-target="#main-content"
 									hx-push-url="true"
-									x-on:click={ "currentMailboxID = '" + mb.ID.String() + "'; filter = 'unread'" }
+									x-on:click={ "currentMailboxID = '" + mb.ID.String() + "'; filter = 'mail'" }
 									class="flex items-center gap-2 text-xs font-bold uppercase tracking-widest transition-colors cursor-pointer group min-w-0"
 									:class={ fmt.Sprintf("currentMailboxID === '%s' ? 'text-purple-700' : 'text-gray-400 hover:text-gray-600'", mb.ID.String()) }
 								>
@@ -221,8 +238,7 @@ templ Dashboard(user *models.User, mailboxes []models.Mailbox, currentMailboxID 
 							</div>
 
 							<div class="pl-4 space-y-1" x-show={ "currentMailboxID === '" + mb.ID.String() + "'" } x-cloak>
-								@SidebarFilterLink(mb.ID, "unread", "Unread", IconUnread(), counts["unread"], currentMailboxID == mb.ID && filter == "unread", true)
-								@SidebarFilterLink(mb.ID, "read", "Read", IconRead(), 0, currentMailboxID == mb.ID && filter == "read", true)
+								@SidebarFilterLink(mb.ID, "mail", "Mail", IconUnread(), counts["unread"], currentMailboxID == mb.ID && filter == "mail", true)
 								@SidebarFilterLink(mb.ID, "starred", "Starred", IconStarred(), 0, currentMailboxID == mb.ID && filter == "starred", true)
 								<div class="my-1 mx-2 border-t border-gray-100"></div>
 								@SidebarFilterLink(mb.ID, "sent", "Sent", IconSent(), 0, currentMailboxID == mb.ID && filter == "sent", true)
@@ -359,11 +375,7 @@ templ MailboxContent(mailboxID uuid.UUID, filter string, emails []models.Email, 
 	<header class="h-16 border-b border-gray-100 flex items-center justify-between px-6 bg-white sticky top-0 z-10">
 		<div class="flex items-center gap-4">
 			<h2 class="text-xl font-bold text-gray-900 uppercase tracking-tight">
-				if filter == "" || filter == "all" || filter == "inbox" {
-					Inbox
-				} else {
-					{ filter }
-				}
+				{ mailboxFilterTitle(filter) }
 			</h2>
 		</div>
 
@@ -415,7 +427,12 @@ templ MailboxContent(mailboxID uuid.UUID, filter string, emails []models.Email, 
 	</div>
 
 	<!-- Email List -->
-	<div class="flex-1 overflow-y-auto">
+	<div
+		class="flex-1 overflow-y-auto"
+		x-data={ fmt.Sprintf(`{ scrollKey: 'mailbox-scroll-%s-%s' }`, mailboxID.String(), filter) }
+		x-init="$nextTick(() => { const p = sessionStorage.getItem(scrollKey); if (p) $el.scrollTop = parseInt(p, 10); })"
+		@scroll.passive="sessionStorage.setItem(scrollKey, $el.scrollTop)"
+	>
 		if len(emails) > 0 {
 			{{
 				last := emails[len(emails)-1]
@@ -459,19 +476,25 @@ templ MailboxContent(mailboxID uuid.UUID, filter string, emails []models.Email, 
 		class="absolute bottom-6 left-1/2 -translate-x-1/2 z-20 flex items-center gap-2 bg-gray-900 text-white rounded-2xl shadow-2xl px-4 py-3"
 	>
 		<span class="text-sm font-semibold text-gray-300 pr-2 border-r border-gray-700" x-text="selected.size + ' selected'"></span>
-		<button class="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-lg hover:bg-gray-700 transition-colors cursor-pointer">
+		<button
+			@click="htmx.ajax('POST', '/mailbox/' + currentMailboxID + '/bulk?filter=' + filter, {target: '#main-content', swap: 'innerHTML', values: {ids: Array.from(selected).join(','), action: 'mark-read'}}); selected = new Set()"
+			class="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-lg hover:bg-gray-700 transition-colors cursor-pointer">
 			<svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
 				<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 19v-8.93a2 2 0 01.89-1.664l7-4.666a2 2 0 012.22 0l7 4.666A2 2 0 0121 10.07V19M3 19a2 2 0 002 2h14a2 2 0 002-2M3 19l6.75-4.5M21 19l-6.75-4.5M3 10l6.75 4.5M21 10l-6.75 4.5m0 0l-1.14.76a2 2 0 01-2.22 0l-1.14-.76" />
 			</svg>
 			Mark Read
 		</button>
-		<button class="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-lg hover:bg-gray-700 transition-colors cursor-pointer">
+		<button
+			@click="htmx.ajax('POST', '/mailbox/' + currentMailboxID + '/bulk?filter=' + filter, {target: '#main-content', swap: 'innerHTML', values: {ids: Array.from(selected).join(','), action: 'mark-unread'}}); selected = new Set()"
+			class="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-lg hover:bg-gray-700 transition-colors cursor-pointer">
 			<svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
 				<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
 			</svg>
 			Mark Unread
 		</button>
-		<button class="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-lg hover:bg-red-600 transition-colors cursor-pointer text-red-400 hover:text-white">
+		<button
+			@click="htmx.ajax('POST', '/mailbox/' + currentMailboxID + '/bulk?filter=' + filter, {target: '#main-content', swap: 'innerHTML', values: {ids: Array.from(selected).join(','), action: 'delete'}}); selected = new Set()"
+			class="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-lg hover:bg-red-600 transition-colors cursor-pointer text-red-400 hover:text-white">
 			<svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
 				<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
 			</svg>

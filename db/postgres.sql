@@ -262,7 +262,8 @@ CREATE TABLE public.mailbox_block_rule (
     address_pattern text NOT NULL,
     is_active boolean DEFAULT true,
     create_datetime timestamp with time zone DEFAULT CURRENT_TIMESTAMP,
-    update_datetime timestamp with time zone DEFAULT CURRENT_TIMESTAMP
+    update_datetime timestamp with time zone DEFAULT CURRENT_TIMESTAMP,
+    user_id uuid
 );
 
 
@@ -954,6 +955,14 @@ ALTER TABLE ONLY public.mailbox_block_rule
 
 
 --
+-- Name: mailbox_block_rule mailbox_block_rule_user_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.mailbox_block_rule
+    ADD CONSTRAINT mailbox_block_rule_user_id_fkey FOREIGN KEY (user_id) REFERENCES public."user"(id) ON DELETE SET NULL;
+
+
+--
 -- Name: mailbox_filter_condition mailbox_filter_condition_rule_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -1063,4 +1072,5 @@ INSERT INTO public.schema_migrations (version) VALUES
     ('20260331000001'),
     ('20260401000000'),
     ('20260405000000'),
-    ('20260422000000');
+    ('20260422000000'),
+    ('20260509000000');

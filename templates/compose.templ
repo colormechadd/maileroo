@@ -68,9 +68,17 @@ templ addressAutocomplete(fieldID, fieldName, label, value string, required bool
 templ Compose(addresses []models.SendingAddress, fromID, to, cc, bcc, subject, inReplyTo, references, draftID, title, body, bodyHTML string) {
 	{{
 		startIsHTML := bodyHTML != "" || body == ""
+		focusField := "to"
+		if to != "" {
+			focusField = "subject"
+			if subject != "" {
+				focusField = "body"
+			}
+		}
 	}}
 	<div class="flex-1 flex flex-col h-full bg-white overflow-hidden animate-in slide-in-from-bottom-4 duration-300"
-		 x-data={ fmt.Sprintf("{ sending: false, attachments: [], isHTML: %v, showCc: %v, showBcc: %v, handleFiles(files) { Array.from(files).forEach(file => { if (!this.attachments.find(a => a.name === file.name && a.size === file.size)) { this.attachments.push(file); } }); this.syncFiles(); }, removeFile(index) { this.attachments.splice(index, 1); this.syncFiles(); }, syncFiles() { const dt = new DataTransfer(); this.attachments.forEach(file => dt.items.add(file)); this.$refs.fileInput.files = dt.files; } }", startIsHTML, cc != "", bcc != "") }>
+		 x-data={ fmt.Sprintf("{ sending: false, attachments: [], isHTML: %v, showCc: %v, showBcc: %v, focusField: %q, handleFiles(files) { Array.from(files).forEach(file => { if (!this.attachments.find(a => a.name === file.name && a.size === file.size)) { this.attachments.push(file); } }); this.syncFiles(); }, removeFile(index) { this.attachments.splice(index, 1); this.syncFiles(); }, syncFiles() { const dt = new DataTransfer(); this.attachments.forEach(file => dt.items.add(file)); this.$refs.fileInput.files = dt.files; } }", startIsHTML, cc != "", bcc != "", focusField) }
+		 x-init="$nextTick(() => { if (focusField === 'to') { document.getElementById('to')?.focus(); } else if (focusField === 'subject') { document.getElementById('subject')?.focus(); } else if (!isHTML) { document.getElementById('body')?.focus(); } })">
 		<header class="h-16 border-b border-purple-100 flex items-center justify-between px-8 bg-white/80 backdrop-blur-sm sticky top-0 z-10">
 			<div class="flex items-center space-x-4">
 				<h2 class="text-lg font-bold text-gray-900 uppercase tracking-tight">{ title }</h2>
@@ -93,7 +101,7 @@ templ Compose(addresses []models.SendingAddress, fromID, to, cc, bcc, subject, i
 					</button>
 				</div>
 			</div>
-			<button class="text-gray-400 hover:text-gray-600 transition-colors cursor-pointer p-2 hover:bg-gray-100 rounded-full" @click="htmx.ajax('GET', '/mailbox/' + currentMailboxID + '?filter=' + filter, {target: '#main-content', swap: 'innerHTML', pushUrl: '/mailbox/' + currentMailboxID + '?filter=' + filter})" title="Cancel">
+			<button class="text-gray-400 hover:text-gray-600 transition-colors cursor-pointer p-2 hover:bg-gray-100 rounded-full" @click="history.back()" title="Cancel">
 				<svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
 					<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
 				</svg>
@@ -202,7 +210,7 @@ templ Compose(addresses []models.SendingAddress, fromID, to, cc, bcc, subject, i
 							<!-- Rich Text Editor (Trix) -->
 							<div x-show="isHTML" class="border border-purple-100 focus-within:border-purple-500 transition-all rounded-xl bg-white overflow-hidden shadow-sm">
 								<input id="body_html" type="hidden" name="body_html"/>
-								<trix-editor input="body_html" class="trix-content outline-none font-sans text-gray-800 leading-relaxed" data-forward-html={ bodyHTML } x-init="$el.addEventListener('trix-initialize', () => { const h = $el.dataset.forwardHtml; if (h) $el.editor.loadHTML(h) })"></trix-editor>
+								<trix-editor input="body_html" class="trix-content outline-none font-sans text-gray-800 leading-relaxed" data-forward-html={ bodyHTML } x-init="$el.addEventListener('trix-initialize', () => { const h = $el.dataset.forwardHtml; if (h) $el.editor.loadHTML(h); if (focusField === 'body') $el.focus(); })"></trix-editor>
 							</div>
 
 							<!-- Plain Text Fallback -->

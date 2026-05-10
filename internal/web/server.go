@@ -14,6 +14,7 @@ import (
 	"mime"
 	"net"
 	"net/http"
+	netmail "net/mail"
 	"net/url"
 	"regexp"
 	"strings"
@@ -130,6 +131,15 @@ func (s *Server) Routes() http.Handler {
 	r.Use(middleware.Recoverer)
 	r.Use(securityHeaders)
 
+	r.NotFound(func(w http.ResponseWriter, r *http.Request) {
+		slog.Warn("route not found", "method", r.Method, "path", r.URL.Path)
+		http.Error(w, "Not found", http.StatusNotFound)
+	})
+	r.MethodNotAllowed(func(w http.ResponseWriter, r *http.Request) {
+		slog.Warn("method not allowed", "method", r.Method, "path", r.URL.Path)
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+	})
+
 	fs := http.FileServer(http.Dir("static"))
 	r.Handle("/static/*", http.StripPrefix("/static/", fs))
 
@@ -159,6 +169,7 @@ func (s *Server) Routes() http.Handler {
 			r.Post("/email/{emailID}/mark-ham", s.handleEmailMarkHam)
 			r.Post("/email/{emailID}/unsubscribe", s.handleEmailUnsubscribe)
 			r.Post("/email/{emailID}/block", s.handleEmailBlockSender)
+			r.Post("/email/{emailID}/delete-and-block", s.handleEmailDeleteAndBlock)
 		})
 		r.Get("/attachment/{attachmentID}", s.handleAttachmentDownload)
 
@@ -174,11 +185,13 @@ func (s *Server) Routes() http.Handler {
 		r.Get("/contacts", s.handleContactsPage)
 		r.Get("/contacts/search", s.handleContactSearch)
 		r.Post("/contacts", s.handleContactCreate)
+		r.Get("/contacts/{contactID}", s.handleContactView)
 		r.Put("/contacts/{contactID}", s.handleContactUpdate)
 		r.Delete("/contacts/{contactID}", s.handleContactDelete)
 		r.Post("/contacts/{contactID}/favorite", s.handleContactToggleFavorite)
 		r.Post("/email/{emailID}/add-contact", s.handleAddContactFromEmail)
 
+		r.Post("/mailbox/{mailboxID}/bulk", s.handleBulkEmailAction)
 		r.Get("/mailbox/{mailboxID}/filters", s.handleFilterRulesList)
 		r.Post("/mailbox/{mailboxID}/filters", s.handleFilterRuleCreate)
 		r.Get("/mailbox/{mailboxID}/filters/new", s.handleFilterRuleNew)
@@ -186,6 +199,8 @@ func (s *Server) Routes() http.Handler {
 		r.Put("/mailbox/{mailboxID}/filters/{ruleID}", s.handleFilterRuleUpdate)
 		r.Delete("/mailbox/{mailboxID}/filters/{ruleID}", s.handleFilterRuleDelete)
 		r.Post("/mailbox/{mailboxID}/filters/reorder", s.handleFilterRuleReorder)
+		r.Post("/mailbox/{mailboxID}/block-rules", s.handleManualBlockSender)
+		r.Delete("/mailbox/{mailboxID}/block-rules/{blockRuleID}", s.handleUnblockSender)
 	})
 
 	return csrfMiddleware(r)
@@ -275,6 +290,26 @@ func (s *Server) handleCompose(w http.ResponseWriter, r *http.Request) {
 						fromID = addr.ID.String()
 						break
 					}
+				}
+
+				dateStr := orig.ReceiveDatetime.Format("Jan 02, 2006, 15:04")
+				origBody, origIsHTML, _ := s.Mail.FetchBody(r.Context(), orig)
+				if origIsHTML {
+					headerHTML := fmt.Sprintf(
+						"On %s, %s wrote:<br>",
+						html.EscapeString(dateStr),
+						html.EscapeString(orig.FromAddress),
+					)
+					bodyHTML = fmt.Sprintf(
+						`<br><br><blockquote style="border-left:2px solid #ccc;margin:0;padding:0 0 0 0.75em">%s%s</blockquote>`,
+						headerHTML, origBody,
+					)
+				} else {
+					body = fmt.Sprintf(
+						"\n\nOn %s, %s wrote:\n\n%s",
+						dateStr, orig.FromAddress,
+						strings.ReplaceAll(origBody, "\n", "\n> "),
+					)
 				}
 			}
 		}
@@ -627,10 +662,8 @@ func filterTitle(filter string) string {
 	switch filter {
 	case "sent":
 		return "Sent"
-	case "unread":
-		return "Unread"
-	case "read":
-		return "Read"
+	case "mail":
+		return "Mail"
 	case "starred":
 		return "Starred"
 	case "quarantined":
@@ -638,7 +671,7 @@ func filterTitle(filter string) string {
 	case "deleted":
 		return "Deleted"
 	default:
-		return "Inbox"
+		return "Mail"
 	}
 }
 
@@ -656,6 +689,18 @@ func (s *Server) draftCount(ctx context.Context, mailboxID uuid.UUID, userID uui
 	}
 	count, _ := s.DB.CountDraftsByMailboxID(ctx, mailboxID, userID)
 	return count
+}
+
+func defaultMailboxID(mailboxes []models.Mailbox) uuid.UUID {
+	for _, mb := range mailboxes {
+		if strings.ToLower(mb.Name) == "inbox" {
+			return mb.ID
+		}
+	}
+	if len(mailboxes) > 0 {
+		return mailboxes[0].ID
+	}
+	return uuid.Nil
 }
 
 func (s *Server) getCounts(ctx context.Context, mailboxID, userID uuid.UUID) map[string]int {
@@ -711,7 +756,14 @@ func (s *Server) handleMailboxView(w http.ResponseWriter, r *http.Request) {
 
 	filter := r.URL.Query().Get("filter")
 	if filter == "" {
-		filter = "all"
+		filter = "mail"
+		canonical := "/mailbox/" + mailboxID.String() + "?filter=mail"
+		if r.Header.Get("HX-Request") == "true" {
+			w.Header().Set("HX-Replace-Url", canonical)
+		} else {
+			http.Redirect(w, r, canonical, http.StatusSeeOther)
+			return
+		}
 	}
 
 	mailboxes, err := s.DB.GetMailboxesByUserID(r.Context(), user.ID)
@@ -980,8 +1032,23 @@ func (s *Server) handleEmailView(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	senderAddr := email.FromAddress
+	if parsed, err := netmail.ParseAddress(email.FromAddress); err == nil {
+		senderAddr = parsed.Address
+	}
+	senderContact, err := s.DB.GetContactByEmail(r.Context(), user.ID, senderAddr)
+	if err != nil {
+		senderContact = nil
+	}
+
+	senderBlocked, err := s.DB.IsBlockedByMailboxRules(r.Context(), email.MailboxID, senderAddr)
+	if err != nil {
+		slog.Error("failed to check block rules", "mailbox_id", email.MailboxID, "error", err)
+		senderBlocked = false
+	}
+
 	counts := s.getCounts(r.Context(), email.MailboxID, user.ID)
-	s.render(w, r, user, mailboxes, email.MailboxID, "all", counts, templates.EmailDetail(email, attachments, content, isHTML, unsubInfo), truncateTitle(email.Subject, 60))
+	s.render(w, r, user, mailboxes, email.MailboxID, "all", counts, templates.EmailDetail(email, attachments, content, isHTML, unsubInfo, senderContact, senderBlocked), truncateTitle(email.Subject, 60))
 }
 
 func (s *Server) handleEmailStar(w http.ResponseWriter, r *http.Request) {
@@ -1028,7 +1095,80 @@ func (s *Server) handleEmailStar(w http.ResponseWriter, r *http.Request) {
 		slog.Error("failed to fetch unsubscribe info", "key", email.StorageKey, "error", err)
 	}
 
-	templates.EmailDetail(email, attachments, content, isHTML, unsubInfo).Render(r.Context(), w)
+	starSenderAddr := email.FromAddress
+	if parsed, err := netmail.ParseAddress(email.FromAddress); err == nil {
+		starSenderAddr = parsed.Address
+	}
+	senderContact, _ := s.DB.GetContactByEmail(r.Context(), user.ID, starSenderAddr)
+	starSenderBlocked, _ := s.DB.IsBlockedByMailboxRules(r.Context(), email.MailboxID, starSenderAddr)
+	templates.EmailDetail(email, attachments, content, isHTML, unsubInfo, senderContact, starSenderBlocked).Render(r.Context(), w)
+}
+
+func (s *Server) handleBulkEmailAction(w http.ResponseWriter, r *http.Request) {
+	user := r.Context().Value("user").(*models.User)
+	mailboxID, err := uuid.Parse(chi.URLParam(r, "mailboxID"))
+	if err != nil {
+		http.Error(w, "Invalid ID", http.StatusBadRequest)
+		return
+	}
+
+	if err := r.ParseForm(); err != nil {
+		http.Error(w, "Bad request", http.StatusBadRequest)
+		return
+	}
+
+	rawIDs := strings.Split(r.FormValue("ids"), ",")
+	var ids []uuid.UUID
+	for _, raw := range rawIDs {
+		raw = strings.TrimSpace(raw)
+		if id, err := uuid.Parse(raw); err == nil {
+			ids = append(ids, id)
+		}
+	}
+	if len(ids) == 0 {
+		http.Error(w, "No valid IDs", http.StatusBadRequest)
+		return
+	}
+
+	action := r.FormValue("action")
+	switch action {
+	case "mark-read":
+		if err := s.DB.BulkMarkEmailRead(r.Context(), ids, user.ID, true); err != nil {
+			slog.Error("bulk mark read failed", "error", err)
+			http.Error(w, "Internal error", http.StatusInternalServerError)
+			return
+		}
+	case "mark-unread":
+		if err := s.DB.BulkMarkEmailRead(r.Context(), ids, user.ID, false); err != nil {
+			slog.Error("bulk mark unread failed", "error", err)
+			http.Error(w, "Internal error", http.StatusInternalServerError)
+			return
+		}
+	case "delete":
+		if err := s.DB.BulkUpdateEmailStatus(r.Context(), ids, user.ID, models.StatusDeleted); err != nil {
+			slog.Error("bulk delete failed", "error", err)
+			http.Error(w, "Internal error", http.StatusInternalServerError)
+			return
+		}
+	default:
+		http.Error(w, "Unknown action", http.StatusBadRequest)
+		return
+	}
+
+	filter := r.URL.Query().Get("filter")
+	if filter == "" {
+		filter = "unread"
+	}
+	mailboxes, _ := s.DB.GetMailboxesByUserID(r.Context(), user.ID)
+	counts := s.getCounts(r.Context(), mailboxID, user.ID)
+	emails, err := s.DB.GetEmailsByMailboxID(r.Context(), mailboxID, filter, 50, nil, nil)
+	if err != nil {
+		slog.Error("failed to fetch emails after bulk action", "error", err)
+		http.Error(w, "Internal error", http.StatusInternalServerError)
+		return
+	}
+	hasMore := len(emails) == 50
+	s.render(w, r, user, mailboxes, mailboxID, filter, counts, templates.MailboxContent(mailboxID, filter, emails, "", hasMore), "")
 }
 
 func (s *Server) handleEmailDelete(w http.ResponseWriter, r *http.Request) {
@@ -1053,6 +1193,43 @@ func (s *Server) handleEmailDelete(w http.ResponseWriter, r *http.Request) {
 
 	if err := s.DB.UpdateEmailStatus(r.Context(), emailID, user.ID, targetStatus); err != nil {
 		slog.Error("failed to toggle delete", "email_id", emailID, "error", err)
+		http.Error(w, "Error", http.StatusInternalServerError)
+		return
+	}
+
+	if r.Header.Get("HX-Request") == "true" {
+		w.Header().Set("HX-Redirect", "/mailbox/"+email.MailboxID.String())
+		return
+	}
+	http.Redirect(w, r, "/mailbox/"+email.MailboxID.String(), http.StatusSeeOther)
+}
+
+func (s *Server) handleEmailDeleteAndBlock(w http.ResponseWriter, r *http.Request) {
+	user := r.Context().Value("user").(*models.User)
+	emailID, err := uuid.Parse(chi.URLParam(r, "emailID"))
+	if err != nil {
+		http.Error(w, "Invalid ID", http.StatusBadRequest)
+		return
+	}
+
+	email, err := s.DB.GetEmailByIDForUser(r.Context(), emailID, user.ID)
+	if err != nil {
+		http.Error(w, "Not found", http.StatusNotFound)
+		return
+	}
+
+	addr := email.FromAddress
+	if parsed, err := netmail.ParseAddress(email.FromAddress); err == nil {
+		addr = parsed.Address
+	}
+	if err := s.DB.CreateBlockRule(r.Context(), email.MailboxID, user.ID, regexp.QuoteMeta(addr)); err != nil {
+		slog.Error("failed to create block rule", "mailbox_id", email.MailboxID, "error", err)
+		http.Error(w, "Error", http.StatusInternalServerError)
+		return
+	}
+
+	if err := s.DB.UpdateEmailStatus(r.Context(), emailID, user.ID, models.StatusDeleted); err != nil {
+		slog.Error("failed to delete email", "email_id", emailID, "error", err)
 		http.Error(w, "Error", http.StatusInternalServerError)
 		return
 	}
@@ -1155,16 +1332,80 @@ func (s *Server) handleEmailBlockSender(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	// Escape the sender address for use as a literal regex pattern
-	pattern := "^" + regexp.QuoteMeta(email.FromAddress) + "$"
-	if err := s.DB.CreateBlockRule(r.Context(), email.MailboxID, pattern); err != nil {
+	addr := email.FromAddress
+	if parsed, err := netmail.ParseAddress(email.FromAddress); err == nil {
+		addr = parsed.Address
+	}
+	pattern := regexp.QuoteMeta(addr)
+	if err := s.DB.CreateBlockRule(r.Context(), email.MailboxID, user.ID, pattern); err != nil {
 		slog.Error("failed to create block rule", "mailbox_id", email.MailboxID, "error", err)
 		http.Error(w, "Error", http.StatusInternalServerError)
 		return
 	}
 
-	w.Header().Set("HX-Reswap", "none")
+	attachments, err := s.DB.GetAttachmentsByEmailID(r.Context(), emailID)
+	if err != nil {
+		slog.Error("failed to fetch attachments", "email_id", emailID, "error", err)
+	}
+	content, isHTML, err := s.Mail.FetchBody(r.Context(), email)
+	if err != nil {
+		slog.Error("failed to fetch body", "key", email.StorageKey, "error", err)
+		content = "Failed to load content"
+	}
+	unsubInfo, _ := s.Mail.FetchUnsubscribeInfo(r.Context(), email)
+	senderContact, _ := s.DB.GetContactByEmail(r.Context(), user.ID, addr)
+
 	w.Header().Set("HX-Trigger", `{"showToast":"Sender blocked"}`)
+	templates.EmailDetail(email, attachments, content, isHTML, unsubInfo, senderContact, true).Render(r.Context(), w)
+}
+
+func (s *Server) handleManualBlockSender(w http.ResponseWriter, r *http.Request) {
+	user := r.Context().Value("user").(*models.User)
+	mailboxID, _, err := s.getMailboxForUser(r, chi.URLParam(r, "mailboxID"), user.ID)
+	if err != nil {
+		http.Error(w, "Not found", http.StatusNotFound)
+		return
+	}
+
+	addr := strings.TrimSpace(r.FormValue("address"))
+	if addr == "" {
+		http.Error(w, "Address required", http.StatusBadRequest)
+		return
+	}
+	if parsed, err := netmail.ParseAddress(addr); err == nil {
+		addr = parsed.Address
+	}
+
+	pattern := regexp.QuoteMeta(addr)
+	if err := s.DB.CreateBlockRule(r.Context(), mailboxID, user.ID, pattern); err != nil {
+		slog.Error("failed to create block rule", "mailbox_id", mailboxID, "error", err)
+		http.Error(w, "Error", http.StatusInternalServerError)
+		return
+	}
+
+	http.Redirect(w, r, "/mailbox/"+mailboxID.String()+"/filters", http.StatusSeeOther)
+}
+
+func (s *Server) handleUnblockSender(w http.ResponseWriter, r *http.Request) {
+	mailboxID, _, err := s.getMailboxForUser(r, chi.URLParam(r, "mailboxID"), r.Context().Value("user").(*models.User).ID)
+	if err != nil {
+		http.Error(w, "Not found", http.StatusNotFound)
+		return
+	}
+
+	blockRuleID, err := uuid.Parse(chi.URLParam(r, "blockRuleID"))
+	if err != nil {
+		http.Error(w, "Invalid ID", http.StatusBadRequest)
+		return
+	}
+
+	if err := s.DB.DeleteBlockRule(r.Context(), blockRuleID, mailboxID); err != nil {
+		slog.Error("failed to delete block rule", "block_rule_id", blockRuleID, "error", err)
+		http.Error(w, "Error", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("HX-Trigger", `{"showToast":"Sender unblocked"}`)
 	w.WriteHeader(http.StatusOK)
 }
 
@@ -1671,6 +1912,13 @@ func (s *Server) handleFilterRulesList(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	blockRules, err := s.DB.ListBlockRules(r.Context(), mailboxID)
+	if err != nil {
+		slog.Error("failed to list block rules", "mailbox_id", mailboxID, "error", err)
+		http.Error(w, "Internal error", http.StatusInternalServerError)
+		return
+	}
+
 	var mbName string
 	for _, mb := range mailboxes {
 		if mb.ID == mailboxID {
@@ -1680,7 +1928,7 @@ func (s *Server) handleFilterRulesList(w http.ResponseWriter, r *http.Request) {
 	}
 
 	counts := s.getCounts(r.Context(), mailboxID, user.ID)
-	s.render(w, r, user, mailboxes, mailboxID, "filters", counts, templates.MailboxConfig(mailboxID, mbName, mbUsers, sendingAddresses, rules), "Configure Mailbox")
+	s.render(w, r, user, mailboxes, mailboxID, "filters", counts, templates.MailboxConfig(mailboxID, mbName, mbUsers, sendingAddresses, rules, blockRules, csrf.Token(r)), "Configure Mailbox")
 }
 
 func (s *Server) handleFilterRuleNew(w http.ResponseWriter, r *http.Request) {

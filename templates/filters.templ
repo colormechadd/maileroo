@@ -3,11 +3,12 @@ package templates
 import (
 	"encoding/json"
 	"fmt"
+	"strings"
 	"github.com/colormechadd/mailaroo/pkg/models"
 	"github.com/google/uuid"
 )
 
-templ MailboxConfig(mailboxID uuid.UUID, mailboxName string, users []models.User, sendingAddresses []models.SendingAddress, rules []*models.FilterRule) {
+templ MailboxConfig(mailboxID uuid.UUID, mailboxName string, users []models.User, sendingAddresses []models.SendingAddress, rules []*models.FilterRule, blockRules []*models.MailboxBlockRule, csrfToken string) {
 	<div class="flex-1 flex flex-col min-h-0 bg-gray-50">
 		<div class="bg-white border-b border-gray-200 px-6 py-4">
 			<h1 class="text-xl font-bold text-gray-900">Configure Mailbox</h1>
@@ -152,6 +153,82 @@ templ MailboxConfig(mailboxID uuid.UUID, mailboxName string, users []models.User
 							}
 						</ul>
 					}
+				</div>
+
+				<!-- Blocked Senders -->
+				<div class="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+					<div class="px-5 py-4 border-b border-gray-100 flex items-center gap-3">
+						<div class="h-8 w-8 rounded-lg bg-red-50 flex items-center justify-center flex-shrink-0">
+							<svg class="w-4 h-4 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+								<path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 115.636 5.636m12.728 12.728L5.636 5.636"/>
+							</svg>
+						</div>
+						<div>
+							<h2 class="text-sm font-bold text-gray-800">Blocked Senders</h2>
+							<p class="text-xs text-gray-400">Email addresses blocked from delivering to this mailbox</p>
+						</div>
+					</div>
+					<div class="px-5 py-3 border-b border-gray-100">
+						<div class="relative">
+							<svg class="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400 pointer-events-none" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+								<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+							</svg>
+							<input
+								type="text"
+								placeholder="Search blocked senders..."
+								class="w-full pl-8 pr-3 py-1.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-200 bg-gray-50"
+								x-data
+								x-on:input="
+									const q = $event.target.value.toLowerCase();
+									document.querySelectorAll('#blocked-senders-list li').forEach(li => {
+										li.style.display = li.dataset.address.includes(q) ? '' : 'none';
+									});
+								"
+							/>
+						</div>
+					</div>
+					if len(blockRules) == 0 {
+						<div class="px-5 py-6 text-center text-sm text-gray-400">No blocked senders</div>
+					} else {
+						<ul id="blocked-senders-list" class="divide-y divide-gray-50 overflow-y-auto max-h-64">
+							for _, br := range blockRules {
+								<li class="flex items-center gap-3 px-5 py-3" data-address={ stripBackslashes(br.AddressPattern) }>
+									<div class="h-8 w-8 rounded-full bg-red-50 flex items-center justify-center flex-shrink-0">
+										<svg class="w-4 h-4 text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+											<path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 115.636 5.636m12.728 12.728L5.636 5.636"/>
+										</svg>
+									</div>
+									<div class="flex-1 min-w-0">
+										<p class="text-sm font-medium text-gray-800 font-mono truncate">{ stripBackslashes(br.AddressPattern) }</p>
+										if br.BlockedByUsername != nil {
+											<p class="text-xs text-gray-400">blocked by { *br.BlockedByUsername }</p>
+										}
+									</div>
+									<button
+										hx-delete={ "/mailbox/" + mailboxID.String() + "/block-rules/" + br.ID.String() }
+										hx-target="closest li"
+										hx-swap="outerHTML"
+										class="text-xs text-red-500 hover:text-red-700 font-medium cursor-pointer flex-shrink-0"
+									>Unblock</button>
+								</li>
+							}
+						</ul>
+					}
+					<div class="px-5 py-4 border-t border-gray-100 bg-gray-50/50">
+						<form method="POST" action={ templ.URL("/mailbox/" + mailboxID.String() + "/block-rules") } class="flex items-center gap-2">
+							<input type="hidden" name="gorilla.csrf.Token" value={ csrfToken }/>
+							<input
+								type="text"
+								name="address"
+								placeholder="email@example.com"
+								class="flex-1 px-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-300"
+							/>
+							<button
+								type="submit"
+								class="px-3 py-1.5 bg-red-600 hover:bg-red-700 text-white text-xs font-semibold rounded-lg transition-all cursor-pointer flex-shrink-0"
+							>Block Address</button>
+						</form>
+					</div>
 				</div>
 
 			</div>
@@ -447,4 +524,8 @@ func filterFormData(rule *models.FilterRule) string {
 		b = []byte("[]")
 	}
 	return fmt.Sprintf(`{ conditions: %s%s`, b, methods)
+}
+
+func stripBackslashes(s string) string {
+	return strings.ReplaceAll(s, `\`, "")
 }

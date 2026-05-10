@@ -91,6 +91,38 @@ func (db *DB) ToggleContactFavorite(ctx context.Context, contactID, userID uuid.
 	return err
 }
 
+func (db *DB) GetContactByEmail(ctx context.Context, userID uuid.UUID, email string) (*models.Contact, error) {
+	var c models.Contact
+	err := db.GetContext(ctx, &c, `
+		SELECT id, user_id, first_name, last_name, email, phone,
+		       street, city, state, postal_code, country, notes, is_favorite,
+		       create_datetime, update_datetime
+		FROM contact
+		WHERE user_id = $1 AND lower(email) = lower($2)
+	`, userID, email)
+	if err != nil {
+		return nil, err
+	}
+	return &c, nil
+}
+
+func (db *DB) GetRecentEmailsByContact(ctx context.Context, userID uuid.UUID, contactEmail string, limit int) ([]models.Email, error) {
+	var emails []models.Email
+	err := db.SelectContext(ctx, &emails, `
+		SELECT
+			id, mailbox_id, thread_id, address_mapping_id, ingestion_id, message_id,
+			in_reply_to, "references", subject, from_address, to_address,
+			reply_to_address, storage_key, size, receive_datetime, is_read, is_star, direction, status, sending_address_id, user_id, body_plain
+		FROM email
+		WHERE user_id = $1
+		  AND status != 'DELETED'
+		  AND (lower(from_address) LIKE '%' || lower($2) || '%' OR lower(to_address) LIKE '%' || lower($2) || '%')
+		ORDER BY receive_datetime DESC, id DESC
+		LIMIT $3
+	`, userID, contactEmail, limit)
+	return emails, err
+}
+
 func (db *DB) UpsertContactFromEmail(ctx context.Context, userID uuid.UUID, email, firstName, lastName string) error {
 	_, err := db.ExecContext(ctx, `
 		INSERT INTO contact (user_id, email, first_name, last_name)

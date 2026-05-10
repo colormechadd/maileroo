@@ -80,10 +80,10 @@ templ Layout(title string, csrfToken string) {
 					if (mailboxMatch) {
 						const mailboxID = mailboxMatch[1];
 						const sub = mailboxMatch[3] || '';
-						const filter = sub.startsWith('filters') ? 'filters' : (params.get('filter') || 'all');
+						const filter = sub.startsWith('filters') ? 'filters' : (params.get('filter') || 'unread');
 						window.dispatchEvent(new CustomEvent('nav-update', { detail: { mailboxID, filter } }));
 					} else if (path.startsWith('/contacts')) {
-						window.dispatchEvent(new CustomEvent('nav-update', { detail: { mailboxID: '', filter: 'contacts' } }));
+						window.dispatchEvent(new CustomEvent('nav-update', { detail: { filter: 'contacts' } }));
 					}
 				});
 			</script>

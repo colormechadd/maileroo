@@ -28,6 +28,8 @@ type WebDB interface {
 	MarkEmailRead(ctx context.Context, emailID, userID uuid.UUID, read bool) error
 	MarkEmailStarred(ctx context.Context, emailID, userID uuid.UUID, starred bool) error
 	UpdateEmailStatus(ctx context.Context, emailID, userID uuid.UUID, status models.EmailStatus) error
+	BulkMarkEmailRead(ctx context.Context, ids []uuid.UUID, userID uuid.UUID, read bool) error
+	BulkUpdateEmailStatus(ctx context.Context, ids []uuid.UUID, userID uuid.UUID, status models.EmailStatus) error
 
 	GetActiveSendingAddresses(ctx context.Context, userID uuid.UUID) ([]models.SendingAddress, error)
 	IsAuthorizedSendingAddress(ctx context.Context, userID uuid.UUID, address string) (bool, error)
@@ -46,13 +48,18 @@ type WebDB interface {
 	ListContacts(ctx context.Context, userID uuid.UUID) ([]models.Contact, error)
 	SearchContacts(ctx context.Context, userID uuid.UUID, query string) ([]models.Contact, error)
 	GetContactByID(ctx context.Context, contactID, userID uuid.UUID) (*models.Contact, error)
+	GetContactByEmail(ctx context.Context, userID uuid.UUID, email string) (*models.Contact, error)
 	CreateContact(ctx context.Context, c models.Contact) (*models.Contact, error)
 	UpdateContact(ctx context.Context, c models.Contact) error
 	DeleteContact(ctx context.Context, contactID, userID uuid.UUID) error
 	ToggleContactFavorite(ctx context.Context, contactID, userID uuid.UUID) error
 	UpsertContactFromEmail(ctx context.Context, userID uuid.UUID, email, firstName, lastName string) error
+	GetRecentEmailsByContact(ctx context.Context, userID uuid.UUID, contactEmail string, limit int) ([]models.Email, error)
 
-	CreateBlockRule(ctx context.Context, mailboxID uuid.UUID, addressPattern string) error
+	CreateBlockRule(ctx context.Context, mailboxID uuid.UUID, userID uuid.UUID, addressPattern string) error
+	ListBlockRules(ctx context.Context, mailboxID uuid.UUID) ([]*models.MailboxBlockRule, error)
+	DeleteBlockRule(ctx context.Context, ruleID, mailboxID uuid.UUID) error
+	IsBlockedByMailboxRules(ctx context.Context, mailboxID uuid.UUID, fromAddress string) (bool, error)
 
 	GetMailboxUsers(ctx context.Context, mailboxID uuid.UUID) ([]models.User, error)
 	GetSendingAddressesByMailboxID(ctx context.Context, mailboxID uuid.UUID) ([]models.SendingAddress, error)
@@ -278,6 +285,31 @@ func (db *DB) UpdateEmailStatus(ctx context.Context, emailID, userID uuid.UUID, 
 		FROM mailbox_user mu
 		WHERE e.mailbox_id = mu.mailbox_id AND e.id = $2 AND mu.user_id = $3 AND mu.is_active = TRUE
 	`, status, emailID, userID)
+	return err
+}
+
+func (db *DB) BulkMarkEmailRead(ctx context.Context, ids []uuid.UUID, userID uuid.UUID, read bool) error {
+	var readTime *time.Time
+	if read {
+		now := time.Now()
+		readTime = &now
+	}
+	_, err := db.ExecContext(ctx, `
+		UPDATE email e
+		SET is_read = $1, read_datetime = $2
+		FROM mailbox_user mu
+		WHERE e.mailbox_id = mu.mailbox_id AND e.id = ANY($3) AND mu.user_id = $4 AND mu.is_active = TRUE
+	`, read, readTime, ids, userID)
+	return err
+}
+
+func (db *DB) BulkUpdateEmailStatus(ctx context.Context, ids []uuid.UUID, userID uuid.UUID, status models.EmailStatus) error {
+	_, err := db.ExecContext(ctx, `
+		UPDATE email e
+		SET status = $1
+		FROM mailbox_user mu
+		WHERE e.mailbox_id = mu.mailbox_id AND e.id = ANY($2) AND mu.user_id = $3 AND mu.is_active = TRUE
+	`, status, ids, userID)
 	return err
 }
 

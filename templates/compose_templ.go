@@ -140,33 +140,40 @@ func Compose(addresses []models.SendingAddress, fromID, to, cc, bcc, subject, in
 		}
 		ctx = templ.ClearChildren(ctx)
 		startIsHTML := bodyHTML != "" || body == ""
+		focusField := "to"
+		if to != "" {
+			focusField = "subject"
+			if subject != "" {
+				focusField = "body"
+			}
+		}
 		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 9, "<div class=\"flex-1 flex flex-col h-full bg-white overflow-hidden animate-in slide-in-from-bottom-4 duration-300\" x-data=\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var8 string
-		templ_7745c5c3_Var8, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf("{ sending: false, attachments: [], isHTML: %v, showCc: %v, showBcc: %v, handleFiles(files) { Array.from(files).forEach(file => { if (!this.attachments.find(a => a.name === file.name && a.size === file.size)) { this.attachments.push(file); } }); this.syncFiles(); }, removeFile(index) { this.attachments.splice(index, 1); this.syncFiles(); }, syncFiles() { const dt = new DataTransfer(); this.attachments.forEach(file => dt.items.add(file)); this.$refs.fileInput.files = dt.files; } }", startIsHTML, cc != "", bcc != ""))
+		templ_7745c5c3_Var8, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf("{ sending: false, attachments: [], isHTML: %v, showCc: %v, showBcc: %v, focusField: %q, handleFiles(files) { Array.from(files).forEach(file => { if (!this.attachments.find(a => a.name === file.name && a.size === file.size)) { this.attachments.push(file); } }); this.syncFiles(); }, removeFile(index) { this.attachments.splice(index, 1); this.syncFiles(); }, syncFiles() { const dt = new DataTransfer(); this.attachments.forEach(file => dt.items.add(file)); this.$refs.fileInput.files = dt.files; } }", startIsHTML, cc != "", bcc != "", focusField))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `templates/compose.templ`, Line: 73, Col: 544}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `templates/compose.templ`, Line: 80, Col: 572}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var8))
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 10, "\"><header class=\"h-16 border-b border-purple-100 flex items-center justify-between px-8 bg-white/80 backdrop-blur-sm sticky top-0 z-10\"><div class=\"flex items-center space-x-4\"><h2 class=\"text-lg font-bold text-gray-900 uppercase tracking-tight\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 10, "\" x-init=\"$nextTick(() => { if (focusField === 'to') { document.getElementById('to')?.focus(); } else if (focusField === 'subject') { document.getElementById('subject')?.focus(); } else if (!isHTML) { document.getElementById('body')?.focus(); } })\"><header class=\"h-16 border-b border-purple-100 flex items-center justify-between px-8 bg-white/80 backdrop-blur-sm sticky top-0 z-10\"><div class=\"flex items-center space-x-4\"><h2 class=\"text-lg font-bold text-gray-900 uppercase tracking-tight\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var9 string
 		templ_7745c5c3_Var9, templ_7745c5c3_Err = templ.JoinStringErrs(title)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `templates/compose.templ`, Line: 76, Col: 80}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `templates/compose.templ`, Line: 84, Col: 80}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var9))
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 11, "</h2><div class=\"flex items-center bg-gray-100 rounded-lg p-1 ml-4\"><button type=\"button\" @click=\"isHTML = false\" class=\"px-3 py-1 text-xs font-bold rounded-md transition-all cursor-pointer\" :class=\"!isHTML ? 'bg-white text-purple-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'\">Plain Text</button> <button type=\"button\" @click=\"isHTML = true\" class=\"px-3 py-1 text-xs font-bold rounded-md transition-all cursor-pointer\" :class=\"isHTML ? 'bg-white text-purple-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'\">Rich Text</button></div></div><button class=\"text-gray-400 hover:text-gray-600 transition-colors cursor-pointer p-2 hover:bg-gray-100 rounded-full\" @click=\"htmx.ajax('GET', '/mailbox/' + currentMailboxID + '?filter=' + filter, {target: '#main-content', swap: 'innerHTML', pushUrl: '/mailbox/' + currentMailboxID + '?filter=' + filter})\" title=\"Cancel\"><svg class=\"h-6 w-6\" fill=\"none\" viewBox=\"0 0 24 24\" stroke=\"currentColor\"><path stroke-linecap=\"round\" stroke-linejoin=\"round\" stroke-width=\"2\" d=\"M6 18L18 6M6 6l12 12\"></path></svg></button></header><div class=\"flex-1 overflow-y-auto p-8\"><div class=\"max-w-4xl mx-auto\"><!-- Auto-save draft trigger: fires on any change to the form after 2s inactivity --><div hx-post=\"/draft\" hx-trigger=\"change from:#compose-form delay:2s\" hx-include=\"#compose-form\" hx-target=\"#draft-status\" hx-swap=\"innerHTML\"></div><form id=\"compose-form\" hx-post=\"/send\" hx-target=\"#main-content\" hx-encoding=\"multipart/form-data\" @submit=\"sending = true\" class=\"space-y-6\"><div class=\"grid grid-cols-1 gap-6\"><!-- From Address --><div><label for=\"from_id\" class=\"block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2 px-1\">From</label><div class=\"relative\"><select id=\"from_id\" name=\"from_id\" required class=\"block w-full bg-gray-50 border-0 border-b-2 border-transparent focus:border-purple-500 focus:bg-white focus:ring-0 rounded-t-lg px-4 py-3 text-gray-900 transition-all cursor-pointer appearance-none font-medium\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 11, "</h2><div class=\"flex items-center bg-gray-100 rounded-lg p-1 ml-4\"><button type=\"button\" @click=\"isHTML = false\" class=\"px-3 py-1 text-xs font-bold rounded-md transition-all cursor-pointer\" :class=\"!isHTML ? 'bg-white text-purple-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'\">Plain Text</button> <button type=\"button\" @click=\"isHTML = true\" class=\"px-3 py-1 text-xs font-bold rounded-md transition-all cursor-pointer\" :class=\"isHTML ? 'bg-white text-purple-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'\">Rich Text</button></div></div><button class=\"text-gray-400 hover:text-gray-600 transition-colors cursor-pointer p-2 hover:bg-gray-100 rounded-full\" @click=\"history.back()\" title=\"Cancel\"><svg class=\"h-6 w-6\" fill=\"none\" viewBox=\"0 0 24 24\" stroke=\"currentColor\"><path stroke-linecap=\"round\" stroke-linejoin=\"round\" stroke-width=\"2\" d=\"M6 18L18 6M6 6l12 12\"></path></svg></button></header><div class=\"flex-1 overflow-y-auto p-8\"><div class=\"max-w-4xl mx-auto\"><!-- Auto-save draft trigger: fires on any change to the form after 2s inactivity --><div hx-post=\"/draft\" hx-trigger=\"change from:#compose-form delay:2s\" hx-include=\"#compose-form\" hx-target=\"#draft-status\" hx-swap=\"innerHTML\"></div><form id=\"compose-form\" hx-post=\"/send\" hx-target=\"#main-content\" hx-encoding=\"multipart/form-data\" @submit=\"sending = true\" class=\"space-y-6\"><div class=\"grid grid-cols-1 gap-6\"><!-- From Address --><div><label for=\"from_id\" class=\"block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2 px-1\">From</label><div class=\"relative\"><select id=\"from_id\" name=\"from_id\" required class=\"block w-full bg-gray-50 border-0 border-b-2 border-transparent focus:border-purple-500 focus:bg-white focus:ring-0 rounded-t-lg px-4 py-3 text-gray-900 transition-all cursor-pointer appearance-none font-medium\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -178,7 +185,7 @@ func Compose(addresses []models.SendingAddress, fromID, to, cc, bcc, subject, in
 			var templ_7745c5c3_Var10 string
 			templ_7745c5c3_Var10, templ_7745c5c3_Err = templ.JoinStringErrs(addr.ID.String())
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `templates/compose.templ`, Line: 134, Col: 42}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `templates/compose.templ`, Line: 142, Col: 42}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var10))
 			if templ_7745c5c3_Err != nil {
@@ -202,7 +209,7 @@ func Compose(addresses []models.SendingAddress, fromID, to, cc, bcc, subject, in
 				var templ_7745c5c3_Var11 string
 				templ_7745c5c3_Var11, templ_7745c5c3_Err = templ.JoinStringErrs(*addr.DisplayName)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `templates/compose.templ`, Line: 136, Col: 31}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `templates/compose.templ`, Line: 144, Col: 31}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var11))
 				if templ_7745c5c3_Err != nil {
@@ -215,7 +222,7 @@ func Compose(addresses []models.SendingAddress, fromID, to, cc, bcc, subject, in
 				var templ_7745c5c3_Var12 string
 				templ_7745c5c3_Var12, templ_7745c5c3_Err = templ.JoinStringErrs(addr.Address)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `templates/compose.templ`, Line: 136, Col: 52}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `templates/compose.templ`, Line: 144, Col: 52}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var12))
 				if templ_7745c5c3_Err != nil {
@@ -229,7 +236,7 @@ func Compose(addresses []models.SendingAddress, fromID, to, cc, bcc, subject, in
 				var templ_7745c5c3_Var13 string
 				templ_7745c5c3_Var13, templ_7745c5c3_Err = templ.JoinStringErrs(addr.Address)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `templates/compose.templ`, Line: 138, Col: 26}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `templates/compose.templ`, Line: 146, Col: 26}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var13))
 				if templ_7745c5c3_Err != nil {
@@ -272,7 +279,7 @@ func Compose(addresses []models.SendingAddress, fromID, to, cc, bcc, subject, in
 		var templ_7745c5c3_Var14 string
 		templ_7745c5c3_Var14, templ_7745c5c3_Err = templ.JoinStringErrs(subject)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `templates/compose.templ`, Line: 185, Col: 23}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `templates/compose.templ`, Line: 193, Col: 23}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var14))
 		if templ_7745c5c3_Err != nil {
@@ -285,7 +292,7 @@ func Compose(addresses []models.SendingAddress, fromID, to, cc, bcc, subject, in
 		var templ_7745c5c3_Var15 string
 		templ_7745c5c3_Var15, templ_7745c5c3_Err = templ.JoinStringErrs(inReplyTo)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `templates/compose.templ`, Line: 191, Col: 63}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `templates/compose.templ`, Line: 199, Col: 63}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var15))
 		if templ_7745c5c3_Err != nil {
@@ -298,7 +305,7 @@ func Compose(addresses []models.SendingAddress, fromID, to, cc, bcc, subject, in
 		var templ_7745c5c3_Var16 string
 		templ_7745c5c3_Var16, templ_7745c5c3_Err = templ.JoinStringErrs(references)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `templates/compose.templ`, Line: 192, Col: 63}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `templates/compose.templ`, Line: 200, Col: 63}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var16))
 		if templ_7745c5c3_Err != nil {
@@ -311,7 +318,7 @@ func Compose(addresses []models.SendingAddress, fromID, to, cc, bcc, subject, in
 		var templ_7745c5c3_Var17 string
 		templ_7745c5c3_Var17, templ_7745c5c3_Err = templ.JoinStringErrs(draftID)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `templates/compose.templ`, Line: 193, Col: 78}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `templates/compose.templ`, Line: 201, Col: 78}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var17))
 		if templ_7745c5c3_Err != nil {
@@ -324,20 +331,20 @@ func Compose(addresses []models.SendingAddress, fromID, to, cc, bcc, subject, in
 		var templ_7745c5c3_Var18 string
 		templ_7745c5c3_Var18, templ_7745c5c3_Err = templ.JoinStringErrs(bodyHTML)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `templates/compose.templ`, Line: 205, Col: 141}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `templates/compose.templ`, Line: 213, Col: 141}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var18))
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 27, "\" x-init=\"$el.addEventListener('trix-initialize', () => { const h = $el.dataset.forwardHtml; if (h) $el.editor.loadHTML(h) })\"></trix-editor></div><!-- Plain Text Fallback --><div x-show=\"!isHTML\"><textarea id=\"body\" name=\"body\" rows=\"12\" :required=\"!isHTML\" placeholder=\"Write your message here...\" class=\"block w-full bg-gray-50 border-0 border-b-2 border-transparent focus:border-purple-500 focus:bg-white focus:ring-0 rounded-t-lg px-4 py-4 text-gray-900 transition-all resize-none font-sans leading-relaxed\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 27, "\" x-init=\"$el.addEventListener('trix-initialize', () => { const h = $el.dataset.forwardHtml; if (h) $el.editor.loadHTML(h); if (focusField === 'body') $el.focus(); })\"></trix-editor></div><!-- Plain Text Fallback --><div x-show=\"!isHTML\"><textarea id=\"body\" name=\"body\" rows=\"12\" :required=\"!isHTML\" placeholder=\"Write your message here...\" class=\"block w-full bg-gray-50 border-0 border-b-2 border-transparent focus:border-purple-500 focus:bg-white focus:ring-0 rounded-t-lg px-4 py-4 text-gray-900 transition-all resize-none font-sans leading-relaxed\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var19 string
 		templ_7745c5c3_Var19, templ_7745c5c3_Err = templ.JoinStringErrs(body)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `templates/compose.templ`, Line: 217, Col: 15}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `templates/compose.templ`, Line: 225, Col: 15}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var19))
 		if templ_7745c5c3_Err != nil {
@@ -365,7 +372,7 @@ func Compose(addresses []models.SendingAddress, fromID, to, cc, bcc, subject, in
 			var templ_7745c5c3_Var20 string
 			templ_7745c5c3_Var20, templ_7745c5c3_Err = templ.JoinStringErrs("/draft/" + draftID)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `templates/compose.templ`, Line: 290, Col: 40}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `templates/compose.templ`, Line: 298, Col: 40}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var20))
 			if templ_7745c5c3_Err != nil {

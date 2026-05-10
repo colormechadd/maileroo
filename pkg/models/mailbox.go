@@ -36,3 +36,12 @@ type Thread struct {
 	MailboxID uuid.UUID `db:"mailbox_id" json:"mailbox_id"`
 	Subject   string    `db:"subject" json:"subject"`
 }
+
+type MailboxBlockRule struct {
+	ID               uuid.UUID  `db:"id" json:"id"`
+	MailboxID        uuid.UUID  `db:"mailbox_id" json:"mailbox_id"`
+	AddressPattern   string     `db:"address_pattern" json:"address_pattern"`
+	IsActive         bool       `db:"is_active" json:"is_active"`
+	UserID           *uuid.UUID `db:"user_id" json:"user_id"`
+	BlockedByUsername *string   `db:"username" json:"username"`
+}
