@@ -2,10 +2,12 @@ package templates
 
 import (
 	"github.com/colormechadd/mailaroo/pkg/models"
+	"github.com/google/uuid"
 	"time"
 )
 
-templ ContactsPage(contacts []models.Contact, selected *models.Contact, recentEmails []models.Email, showNew bool) {
+templ ContactsPage(mailboxID uuid.UUID, contacts []models.Contact, selected *models.Contact, recentEmails []models.Email, showNew bool) {
+	{{ base := "/mailbox/" + mailboxID.String() + "/contacts" }}
 	<div class="flex-1 flex h-full overflow-hidden animate-in fade-in duration-300">
 		<!-- Contact List -->
 		<div class="w-80 flex-shrink-0 border-r border-purple-100 flex flex-col bg-white">
@@ -14,7 +16,7 @@ templ ContactsPage(contacts []models.Contact, selected *models.Contact, recentEm
 				<h2 class="text-lg font-bold text-gray-900 uppercase tracking-tight">Contacts</h2>
 				<button
 					class="flex items-center px-3 py-1.5 bg-purple-600 hover:bg-purple-700 text-white rounded-lg text-xs font-bold shadow shadow-purple-200 transition-all cursor-pointer"
-					hx-get="/contacts?new=1"
+					hx-get={ base + "?new=1" }
 					hx-target="#main-content"
 					hx-push-url="true"
 				>
@@ -65,8 +67,8 @@ templ ContactsPage(contacts []models.Contact, selected *models.Contact, recentEm
 						searchKey := (c.FirstName + " " + c.LastName + " " + c.Email)
 					}}
 					<a
-						href={ templ.URL("/contacts?id=" + c.ID.String()) }
-						hx-get={ "/contacts?id=" + c.ID.String() }
+						href={ templ.URL(base + "?id=" + c.ID.String()) }
+						hx-get={ base + "?id=" + c.ID.String() }
 						hx-target="#main-content"
 						hx-push-url="true"
 						data-contact-row
@@ -99,9 +101,9 @@ templ ContactsPage(contacts []models.Contact, selected *models.Contact, recentEm
 		<!-- Detail / Edit Panel -->
 		<div class="flex-1 flex flex-col bg-white overflow-y-auto">
 			if selected != nil {
-				@contactEditForm(selected, recentEmails, false)
+				@contactEditForm(mailboxID, selected, recentEmails, false)
 			} else if showNew {
-				@contactNewForm()
+				@contactNewForm(mailboxID)
 			} else {
 				<div class="flex flex-col items-center justify-center h-full text-center px-8 text-gray-300 space-y-4">
 					<div class="h-20 w-20 bg-gray-50 rounded-full flex items-center justify-center">
@@ -116,15 +118,16 @@ templ ContactsPage(contacts []models.Contact, selected *models.Contact, recentEm
 	</div>
 }
 
-templ contactNewForm() {
+templ contactNewForm(mailboxID uuid.UUID) {
+	{{ base := "/mailbox/" + mailboxID.String() + "/contacts" }}
 	<div class="flex flex-col h-full" id="contact-form-area">
 		<div class="px-8 py-6 border-b border-purple-100">
 			<h3 class="text-lg font-bold text-gray-900">New Contact</h3>
 		</div>
 		<form
-			hx-post="/contacts"
+			hx-post={ base }
 			hx-target="#main-content"
-			hx-push-url="/contacts"
+			hx-push-url={ base }
 			class="flex-1 overflow-y-auto px-8 py-6 space-y-6"
 		>
 			@contactFormFields(models.Contact{}, true)
@@ -132,7 +135,8 @@ templ contactNewForm() {
 	</div>
 }
 
-templ contactEditForm(c *models.Contact, recentEmails []models.Email, _ bool) {
+templ contactEditForm(mailboxID uuid.UUID, c *models.Contact, recentEmails []models.Email, _ bool) {
+	{{ base := "/mailbox/" + mailboxID.String() + "/contacts" }}
 	<div class="flex flex-col h-full" id="contact-form-area">
 		<div class="px-8 py-6 border-b border-purple-100 flex items-center justify-between">
 			<div class="flex items-center gap-4">
@@ -150,7 +154,7 @@ templ contactEditForm(c *models.Contact, recentEmails []models.Email, _ bool) {
 				<!-- Favorite toggle -->
 				<button
 					type="button"
-					hx-post={ "/contacts/" + c.ID.String() + "/favorite" }
+					hx-post={ base + "/" + c.ID.String() + "/favorite" }
 					hx-target="#main-content"
 					title="Toggle favorite"
 					class={ "p-2 rounded-full transition-colors cursor-pointer",
@@ -190,7 +194,7 @@ templ contactEditForm(c *models.Contact, recentEmails []models.Email, _ bool) {
 				<!-- Delete -->
 				<button
 					type="button"
-					hx-delete={ "/contacts/" + c.ID.String() }
+					hx-delete={ base + "/" + c.ID.String() }
 					hx-target="#main-content"
 					hx-confirm="Delete this contact?"
 					title="Delete contact"
@@ -203,7 +207,7 @@ templ contactEditForm(c *models.Contact, recentEmails []models.Email, _ bool) {
 			</div>
 		</div>
 		<form
-			hx-put={ "/contacts/" + c.ID.String() }
+			hx-put={ base + "/" + c.ID.String() }
 			hx-target="#main-content"
 			class="overflow-y-auto px-8 py-6 space-y-6"
 		>

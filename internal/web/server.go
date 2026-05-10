@@ -182,13 +182,13 @@ func (s *Server) Routes() http.Handler {
 		r.Post("/draft", s.handleDraftSave)
 		r.Delete("/draft/{draftID}", s.handleDraftDelete)
 
-		r.Get("/contacts", s.handleContactsPage)
 		r.Get("/contacts/search", s.handleContactSearch)
-		r.Post("/contacts", s.handleContactCreate)
-		r.Get("/contacts/{contactID}", s.handleContactView)
-		r.Put("/contacts/{contactID}", s.handleContactUpdate)
-		r.Delete("/contacts/{contactID}", s.handleContactDelete)
-		r.Post("/contacts/{contactID}/favorite", s.handleContactToggleFavorite)
+		r.Get("/mailbox/{mailboxID}/contacts", s.handleContactsPage)
+		r.Post("/mailbox/{mailboxID}/contacts", s.handleContactCreate)
+		r.Get("/mailbox/{mailboxID}/contacts/{contactID}", s.handleContactView)
+		r.Put("/mailbox/{mailboxID}/contacts/{contactID}", s.handleContactUpdate)
+		r.Delete("/mailbox/{mailboxID}/contacts/{contactID}", s.handleContactDelete)
+		r.Post("/mailbox/{mailboxID}/contacts/{contactID}/favorite", s.handleContactToggleFavorite)
 		r.Post("/email/{emailID}/add-contact", s.handleAddContactFromEmail)
 
 		r.Post("/mailbox/{mailboxID}/bulk", s.handleBulkEmailAction)
@@ -1036,7 +1036,7 @@ func (s *Server) handleEmailView(w http.ResponseWriter, r *http.Request) {
 	if parsed, err := netmail.ParseAddress(email.FromAddress); err == nil {
 		senderAddr = parsed.Address
 	}
-	senderContact, err := s.DB.GetContactByEmail(r.Context(), user.ID, senderAddr)
+	senderContact, err := s.DB.GetContactByEmail(r.Context(), email.MailboxID, senderAddr)
 	if err != nil {
 		senderContact = nil
 	}
@@ -1099,7 +1099,7 @@ func (s *Server) handleEmailStar(w http.ResponseWriter, r *http.Request) {
 	if parsed, err := netmail.ParseAddress(email.FromAddress); err == nil {
 		starSenderAddr = parsed.Address
 	}
-	senderContact, _ := s.DB.GetContactByEmail(r.Context(), user.ID, starSenderAddr)
+	senderContact, _ := s.DB.GetContactByEmail(r.Context(), email.MailboxID, starSenderAddr)
 	starSenderBlocked, _ := s.DB.IsBlockedByMailboxRules(r.Context(), email.MailboxID, starSenderAddr)
 	templates.EmailDetail(email, attachments, content, isHTML, unsubInfo, senderContact, starSenderBlocked).Render(r.Context(), w)
 }
@@ -1353,7 +1353,7 @@ func (s *Server) handleEmailBlockSender(w http.ResponseWriter, r *http.Request) 
 		content = "Failed to load content"
 	}
 	unsubInfo, _ := s.Mail.FetchUnsubscribeInfo(r.Context(), email)
-	senderContact, _ := s.DB.GetContactByEmail(r.Context(), user.ID, addr)
+	senderContact, _ := s.DB.GetContactByEmail(r.Context(), email.MailboxID, addr)
 
 	w.Header().Set("HX-Trigger", `{"showToast":"Sender blocked"}`)
 	templates.EmailDetail(email, attachments, content, isHTML, unsubInfo, senderContact, true).Render(r.Context(), w)

@@ -45,16 +45,17 @@ type WebDB interface {
 	GetDraftsByMailboxID(ctx context.Context, mailboxID, userID uuid.UUID) ([]models.Draft, error)
 	CountDraftsByMailboxID(ctx context.Context, mailboxID, userID uuid.UUID) (int, error)
 
-	ListContacts(ctx context.Context, userID uuid.UUID) ([]models.Contact, error)
-	SearchContacts(ctx context.Context, userID uuid.UUID, query string) ([]models.Contact, error)
-	GetContactByID(ctx context.Context, contactID, userID uuid.UUID) (*models.Contact, error)
-	GetContactByEmail(ctx context.Context, userID uuid.UUID, email string) (*models.Contact, error)
+	ListContacts(ctx context.Context, mailboxID uuid.UUID) ([]models.Contact, error)
+	SearchContacts(ctx context.Context, mailboxID uuid.UUID, query string) ([]models.Contact, error)
+	SearchContactsForUser(ctx context.Context, userID uuid.UUID, query string) ([]models.Contact, error)
+	GetContactByID(ctx context.Context, contactID, mailboxID uuid.UUID) (*models.Contact, error)
+	GetContactByEmail(ctx context.Context, mailboxID uuid.UUID, email string) (*models.Contact, error)
 	CreateContact(ctx context.Context, c models.Contact) (*models.Contact, error)
 	UpdateContact(ctx context.Context, c models.Contact) error
-	DeleteContact(ctx context.Context, contactID, userID uuid.UUID) error
-	ToggleContactFavorite(ctx context.Context, contactID, userID uuid.UUID) error
-	UpsertContactFromEmail(ctx context.Context, userID uuid.UUID, email, firstName, lastName string) error
-	GetRecentEmailsByContact(ctx context.Context, userID uuid.UUID, contactEmail string, limit int) ([]models.Email, error)
+	DeleteContact(ctx context.Context, contactID, mailboxID uuid.UUID) error
+	ToggleContactFavorite(ctx context.Context, contactID, mailboxID uuid.UUID) error
+	UpsertContactFromEmail(ctx context.Context, mailboxID uuid.UUID, email, firstName, lastName string) error
+	GetRecentEmailsByContact(ctx context.Context, mailboxID uuid.UUID, contactEmail string, limit int) ([]models.Email, error)
 
 	CreateBlockRule(ctx context.Context, mailboxID uuid.UUID, userID uuid.UUID, addressPattern string) error
 	ListBlockRules(ctx context.Context, mailboxID uuid.UUID) ([]*models.MailboxBlockRule, error)

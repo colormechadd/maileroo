@@ -258,16 +258,12 @@ templ Dashboard(user *models.User, mailboxes []models.Mailbox, currentMailboxID 
 				<!-- Contacts -->
 				<div class="px-4 py-2 border-t border-purple-100">
 					<a
-						href="/contacts"
-						hx-get="/contacts"
-						hx-target="#main-content"
-						hx-push-url="true"
-						x-on:click="currentMailboxID = ''; filter = 'contacts'"
-						class={ "flex items-center gap-3 px-4 py-2 text-sm font-medium rounded-lg transition-colors cursor-pointer group",
-							templ.KV("bg-purple-100 text-purple-900", filter == "contacts"),
-							templ.KV("text-gray-500 hover:text-purple-600 hover:bg-purple-50/50", filter != "contacts") }
+						href="#"
+						@click.prevent="const url = '/mailbox/' + currentMailboxID + '/contacts'; htmx.ajax('GET', url, {target: '#main-content', swap: 'innerHTML', pushUrl: url}); filter = 'contacts'"
+						class="flex items-center gap-3 px-4 py-2 text-sm font-medium rounded-lg transition-colors cursor-pointer group"
+						:class="filter === 'contacts' ? 'bg-purple-100 text-purple-900' : 'text-gray-500 hover:text-purple-600 hover:bg-purple-50/50'"
 					>
-						<div class={ "h-5 w-5", templ.KV("text-purple-600", filter == "contacts"), templ.KV("text-gray-400 group-hover:text-purple-500", filter != "contacts") }>
+						<div class="h-5 w-5" :class="filter === 'contacts' ? 'text-purple-600' : 'text-gray-400 group-hover:text-purple-500'">
 							@IconContacts()
 						</div>
 						Contacts

@@ -16,6 +16,20 @@ SET client_min_messages = warning;
 SET row_security = off;
 
 --
+-- Name: public; Type: SCHEMA; Schema: -; Owner: -
+--
+
+-- *not* creating schema, since initdb creates it
+
+
+--
+-- Name: SCHEMA public; Type: COMMENT; Schema: -; Owner: -
+--
+
+COMMENT ON SCHEMA public IS '';
+
+
+--
 -- Name: email_direction; Type: TYPE; Schema: public; Owner: -
 --
 
@@ -75,7 +89,7 @@ CREATE TABLE public.address_mapping (
 
 CREATE TABLE public.contact (
     id uuid DEFAULT uuidv7() NOT NULL,
-    user_id uuid NOT NULL,
+    mailbox_id uuid NOT NULL,
     first_name text DEFAULT ''::text NOT NULL,
     last_name text DEFAULT ''::text NOT NULL,
     email text NOT NULL,
@@ -140,6 +154,7 @@ CREATE TABLE public.email (
     ingestion_id uuid,
     thread_id uuid,
     sending_address_id uuid,
+    user_id uuid,
     message_id text NOT NULL,
     subject text,
     from_address text NOT NULL,
@@ -149,6 +164,9 @@ CREATE TABLE public.email (
     "references" text,
     storage_key text NOT NULL,
     size bigint NOT NULL,
+    stored_size bigint DEFAULT 0 NOT NULL,
+    body_plain text,
+    search_vector tsvector GENERATED ALWAYS AS (to_tsvector('english'::regconfig, ((((((COALESCE(subject, ''::text) || ' '::text) || COALESCE(from_address, ''::text)) || ' '::text) || COALESCE(to_address, ''::text)) || ' '::text) || COALESCE(body_plain, ''::text)))) STORED,
     receive_datetime timestamp with time zone DEFAULT CURRENT_TIMESTAMP,
     read_datetime timestamp with time zone,
     star_datetime timestamp with time zone,
@@ -157,11 +175,7 @@ CREATE TABLE public.email (
     direction public.email_direction NOT NULL,
     status public.email_status DEFAULT 'INBOX'::public.email_status NOT NULL,
     create_datetime timestamp with time zone DEFAULT CURRENT_TIMESTAMP,
-    update_datetime timestamp with time zone DEFAULT CURRENT_TIMESTAMP,
-    user_id uuid,
-    body_plain text,
-    search_vector tsvector GENERATED ALWAYS AS (to_tsvector('english'::regconfig, ((((((COALESCE(subject, ''::text) || ' '::text) || COALESCE(from_address, ''::text)) || ' '::text) || COALESCE(to_address, ''::text)) || ' '::text) || COALESCE(body_plain, ''::text)))) STORED,
-    stored_size bigint DEFAULT 0 NOT NULL
+    update_datetime timestamp with time zone DEFAULT CURRENT_TIMESTAMP
 );
 
 
@@ -259,11 +273,11 @@ CREATE TABLE public.mailbox (
 CREATE TABLE public.mailbox_block_rule (
     id uuid DEFAULT uuidv7() NOT NULL,
     mailbox_id uuid NOT NULL,
+    user_id uuid,
     address_pattern text NOT NULL,
     is_active boolean DEFAULT true,
     create_datetime timestamp with time zone DEFAULT CURRENT_TIMESTAMP,
-    update_datetime timestamp with time zone DEFAULT CURRENT_TIMESTAMP,
-    user_id uuid
+    update_datetime timestamp with time zone DEFAULT CURRENT_TIMESTAMP
 );
 
 
@@ -306,7 +320,7 @@ CREATE TABLE public.mailbox_filter_rule (
 --
 
 CREATE TABLE public.mailbox_user (
-    id uuid DEFAULT uuidv7() CONSTRAINT mailbox_user_id_not_null1 NOT NULL,
+    id uuid DEFAULT uuidv7() NOT NULL,
     mailbox_id uuid NOT NULL,
     user_id uuid NOT NULL,
     is_active boolean DEFAULT true NOT NULL,
@@ -355,8 +369,8 @@ CREATE TABLE public.sending_address (
     mailbox_id uuid NOT NULL,
     address text NOT NULL,
     is_active boolean DEFAULT true,
-    create_datetime timestamp with time zone DEFAULT CURRENT_TIMESTAMP,
-    display_name text
+    display_name text,
+    create_datetime timestamp with time zone DEFAULT CURRENT_TIMESTAMP
 );
 
 
@@ -411,19 +425,19 @@ ALTER TABLE ONLY public.address_mapping
 
 
 --
+-- Name: contact contact_mailbox_id_email_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.contact
+    ADD CONSTRAINT contact_mailbox_id_email_key UNIQUE (mailbox_id, email);
+
+
+--
 -- Name: contact contact_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.contact
     ADD CONSTRAINT contact_pkey PRIMARY KEY (id);
-
-
---
--- Name: contact contact_user_id_email_key; Type: CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.contact
-    ADD CONSTRAINT contact_user_id_email_key UNIQUE (user_id, email);
 
 
 --
@@ -626,24 +640,24 @@ CREATE INDEX idx_address_mapping_pattern ON public.address_mapping USING btree (
 
 
 --
--- Name: idx_contact_user_email; Type: INDEX; Schema: public; Owner: -
+-- Name: idx_contact_mailbox_email; Type: INDEX; Schema: public; Owner: -
 --
 
-CREATE INDEX idx_contact_user_email ON public.contact USING btree (user_id, email);
-
-
---
--- Name: idx_contact_user_id; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE INDEX idx_contact_user_id ON public.contact USING btree (user_id);
+CREATE INDEX idx_contact_mailbox_email ON public.contact USING btree (mailbox_id, email);
 
 
 --
--- Name: idx_contact_user_name; Type: INDEX; Schema: public; Owner: -
+-- Name: idx_contact_mailbox_id; Type: INDEX; Schema: public; Owner: -
 --
 
-CREATE INDEX idx_contact_user_name ON public.contact USING btree (user_id, last_name, first_name);
+CREATE INDEX idx_contact_mailbox_id ON public.contact USING btree (mailbox_id);
+
+
+--
+-- Name: idx_contact_mailbox_name; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_contact_mailbox_name ON public.contact USING btree (mailbox_id, last_name, first_name);
 
 
 --
@@ -851,11 +865,11 @@ ALTER TABLE ONLY public.address_mapping
 
 
 --
--- Name: contact contact_user_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+-- Name: contact contact_mailbox_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.contact
-    ADD CONSTRAINT contact_user_id_fkey FOREIGN KEY (user_id) REFERENCES public."user"(id) ON DELETE CASCADE;
+    ADD CONSTRAINT contact_mailbox_id_fkey FOREIGN KEY (mailbox_id) REFERENCES public.mailbox(id) ON DELETE CASCADE;
 
 
 --
@@ -1062,15 +1076,4 @@ ALTER TABLE ONLY public.webmail_session
 --
 
 INSERT INTO public.schema_migrations (version) VALUES
-    ('20260228000000'),
-    ('20260329000000'),
-    ('20260329000001'),
-    ('20260330000000'),
-    ('20260330000001'),
-    ('20260330000002'),
-    ('20260331000000'),
-    ('20260331000001'),
-    ('20260401000000'),
-    ('20260405000000'),
-    ('20260422000000'),
     ('20260509000000');

@@ -13,50 +13,17 @@ import (
 	"github.com/google/uuid"
 )
 
-func (s *Server) handleContactView(w http.ResponseWriter, r *http.Request) {
+func (s *Server) handleContactsPage(w http.ResponseWriter, r *http.Request) {
 	user := r.Context().Value("user").(*models.User)
-	contactID, err := uuid.Parse(chi.URLParam(r, "contactID"))
+	mailboxID, mailboxes, err := s.getMailboxForUser(r, chi.URLParam(r, "mailboxID"), user.ID)
 	if err != nil {
-		slog.Warn("invalid contact ID", "raw", chi.URLParam(r, "contactID"))
-		http.Error(w, "Invalid ID", http.StatusBadRequest)
-		return
-	}
-
-	contacts, err := s.DB.ListContacts(r.Context(), user.ID)
-	if err != nil {
-		slog.Error("failed to list contacts", "user_id", user.ID, "error", err)
-		http.Error(w, "Internal error", http.StatusInternalServerError)
-		return
-	}
-
-	var selected *models.Contact
-	for i := range contacts {
-		if contacts[i].ID == contactID {
-			selected = &contacts[i]
-			break
-		}
-	}
-	if selected == nil {
-		slog.Warn("contact not found", "contact_id", contactID, "user_id", user.ID)
 		http.Error(w, "Not found", http.StatusNotFound)
 		return
 	}
 
-	recentEmails, err := s.DB.GetRecentEmailsByContact(r.Context(), user.ID, selected.Email, 3)
+	contacts, err := s.DB.ListContacts(r.Context(), mailboxID)
 	if err != nil {
-		slog.Error("failed to fetch recent emails for contact", "contact_id", contactID, "error", err)
-		recentEmails = nil
-	}
-
-	mailboxes, _ := s.DB.GetMailboxesByUserID(r.Context(), user.ID)
-	s.render(w, r, user, mailboxes, defaultMailboxID(mailboxes), "contacts", nil, templates.ContactsPage(contacts, selected, recentEmails, false), "Contacts")
-}
-
-func (s *Server) handleContactsPage(w http.ResponseWriter, r *http.Request) {
-	user := r.Context().Value("user").(*models.User)
-	contacts, err := s.DB.ListContacts(r.Context(), user.ID)
-	if err != nil {
-		slog.Error("failed to list contacts", "user_id", user.ID, "error", err)
+		slog.Error("failed to list contacts", "mailbox_id", mailboxID, "error", err)
 		http.Error(w, "Internal error", http.StatusInternalServerError)
 		return
 	}
@@ -76,15 +43,55 @@ func (s *Server) handleContactsPage(w http.ResponseWriter, r *http.Request) {
 
 	var recentEmails []models.Email
 	if selected != nil {
-		recentEmails, err = s.DB.GetRecentEmailsByContact(r.Context(), user.ID, selected.Email, 3)
+		recentEmails, err = s.DB.GetRecentEmailsByContact(r.Context(), mailboxID, selected.Email, 3)
 		if err != nil {
 			slog.Error("failed to fetch recent emails for contact", "contact_id", selected.ID, "error", err)
-			recentEmails = nil
 		}
 	}
 
-	mailboxes, _ := s.DB.GetMailboxesByUserID(r.Context(), user.ID)
-	s.render(w, r, user, mailboxes, defaultMailboxID(mailboxes), "contacts", nil, templates.ContactsPage(contacts, selected, recentEmails, false), "Contacts")
+	showNew := r.URL.Query().Get("new") == "1"
+	s.render(w, r, user, mailboxes, mailboxID, "contacts", nil, templates.ContactsPage(mailboxID, contacts, selected, recentEmails, showNew), "Contacts")
+}
+
+func (s *Server) handleContactView(w http.ResponseWriter, r *http.Request) {
+	user := r.Context().Value("user").(*models.User)
+	mailboxID, mailboxes, err := s.getMailboxForUser(r, chi.URLParam(r, "mailboxID"), user.ID)
+	if err != nil {
+		http.Error(w, "Not found", http.StatusNotFound)
+		return
+	}
+
+	contactID, err := uuid.Parse(chi.URLParam(r, "contactID"))
+	if err != nil {
+		http.Error(w, "Invalid ID", http.StatusBadRequest)
+		return
+	}
+
+	contacts, err := s.DB.ListContacts(r.Context(), mailboxID)
+	if err != nil {
+		slog.Error("failed to list contacts", "mailbox_id", mailboxID, "error", err)
+		http.Error(w, "Internal error", http.StatusInternalServerError)
+		return
+	}
+
+	var selected *models.Contact
+	for i := range contacts {
+		if contacts[i].ID == contactID {
+			selected = &contacts[i]
+			break
+		}
+	}
+	if selected == nil {
+		http.Error(w, "Not found", http.StatusNotFound)
+		return
+	}
+
+	recentEmails, err := s.DB.GetRecentEmailsByContact(r.Context(), mailboxID, selected.Email, 3)
+	if err != nil {
+		slog.Error("failed to fetch recent emails for contact", "contact_id", contactID, "error", err)
+	}
+
+	s.render(w, r, user, mailboxes, mailboxID, "contacts", nil, templates.ContactsPage(mailboxID, contacts, selected, recentEmails, false), "Contacts")
 }
 
 func (s *Server) handleContactSearch(w http.ResponseWriter, r *http.Request) {
@@ -96,7 +103,7 @@ func (s *Server) handleContactSearch(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	contacts, err := s.DB.SearchContacts(r.Context(), user.ID, q)
+	contacts, err := s.DB.SearchContactsForUser(r.Context(), user.ID, q)
 	if err != nil {
 		slog.Error("failed to search contacts", "user_id", user.ID, "error", err)
 		w.Header().Set("Content-Type", "application/json")
@@ -133,13 +140,19 @@ func (s *Server) handleContactSearch(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) handleContactCreate(w http.ResponseWriter, r *http.Request) {
 	user := r.Context().Value("user").(*models.User)
+	mailboxID, _, err := s.getMailboxForUser(r, chi.URLParam(r, "mailboxID"), user.ID)
+	if err != nil {
+		http.Error(w, "Not found", http.StatusNotFound)
+		return
+	}
+
 	if err := r.ParseForm(); err != nil {
 		http.Error(w, "Bad request", http.StatusBadRequest)
 		return
 	}
 
 	c := models.Contact{
-		UserID:     user.ID,
+		MailboxID:  mailboxID,
 		FirstName:  strings.TrimSpace(r.FormValue("first_name")),
 		LastName:   strings.TrimSpace(r.FormValue("last_name")),
 		Email:      strings.TrimSpace(r.FormValue("email")),
@@ -160,18 +173,24 @@ func (s *Server) handleContactCreate(w http.ResponseWriter, r *http.Request) {
 
 	created, err := s.DB.CreateContact(r.Context(), c)
 	if err != nil {
-		slog.Error("failed to create contact", "user_id", user.ID, "error", err)
+		slog.Error("failed to create contact", "mailbox_id", mailboxID, "error", err)
 		http.Error(w, "Internal error", http.StatusInternalServerError)
 		return
 	}
 
-	contacts, _ := s.DB.ListContacts(r.Context(), user.ID)
-	recentEmails, _ := s.DB.GetRecentEmailsByContact(r.Context(), user.ID, created.Email, 3)
-	templates.ContactsPage(contacts, created, recentEmails, false).Render(r.Context(), w)
+	contacts, _ := s.DB.ListContacts(r.Context(), mailboxID)
+	recentEmails, _ := s.DB.GetRecentEmailsByContact(r.Context(), mailboxID, created.Email, 3)
+	templates.ContactsPage(mailboxID, contacts, created, recentEmails, false).Render(r.Context(), w)
 }
 
 func (s *Server) handleContactUpdate(w http.ResponseWriter, r *http.Request) {
 	user := r.Context().Value("user").(*models.User)
+	mailboxID, _, err := s.getMailboxForUser(r, chi.URLParam(r, "mailboxID"), user.ID)
+	if err != nil {
+		http.Error(w, "Not found", http.StatusNotFound)
+		return
+	}
+
 	contactID, err := uuid.Parse(chi.URLParam(r, "contactID"))
 	if err != nil {
 		http.Error(w, "Invalid ID", http.StatusBadRequest)
@@ -185,7 +204,7 @@ func (s *Server) handleContactUpdate(w http.ResponseWriter, r *http.Request) {
 
 	c := models.Contact{
 		ID:         contactID,
-		UserID:     user.ID,
+		MailboxID:  mailboxID,
 		FirstName:  strings.TrimSpace(r.FormValue("first_name")),
 		LastName:   strings.TrimSpace(r.FormValue("last_name")),
 		Email:      strings.TrimSpace(r.FormValue("email")),
@@ -210,54 +229,66 @@ func (s *Server) handleContactUpdate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	updated, _ := s.DB.GetContactByID(r.Context(), contactID, user.ID)
-	contacts, _ := s.DB.ListContacts(r.Context(), user.ID)
-	var updateRecentEmails []models.Email
+	updated, _ := s.DB.GetContactByID(r.Context(), contactID, mailboxID)
+	contacts, _ := s.DB.ListContacts(r.Context(), mailboxID)
+	var recentEmails []models.Email
 	if updated != nil {
-		updateRecentEmails, _ = s.DB.GetRecentEmailsByContact(r.Context(), user.ID, updated.Email, 3)
+		recentEmails, _ = s.DB.GetRecentEmailsByContact(r.Context(), mailboxID, updated.Email, 3)
 	}
-	templates.ContactsPage(contacts, updated, updateRecentEmails, false).Render(r.Context(), w)
+	templates.ContactsPage(mailboxID, contacts, updated, recentEmails, false).Render(r.Context(), w)
 }
 
 func (s *Server) handleContactDelete(w http.ResponseWriter, r *http.Request) {
 	user := r.Context().Value("user").(*models.User)
+	mailboxID, _, err := s.getMailboxForUser(r, chi.URLParam(r, "mailboxID"), user.ID)
+	if err != nil {
+		http.Error(w, "Not found", http.StatusNotFound)
+		return
+	}
+
 	contactID, err := uuid.Parse(chi.URLParam(r, "contactID"))
 	if err != nil {
 		http.Error(w, "Invalid ID", http.StatusBadRequest)
 		return
 	}
 
-	if err := s.DB.DeleteContact(r.Context(), contactID, user.ID); err != nil {
+	if err := s.DB.DeleteContact(r.Context(), contactID, mailboxID); err != nil {
 		slog.Error("failed to delete contact", "contact_id", contactID, "error", err)
 		http.Error(w, "Internal error", http.StatusInternalServerError)
 		return
 	}
 
-	contacts, _ := s.DB.ListContacts(r.Context(), user.ID)
-	templates.ContactsPage(contacts, nil, nil, false).Render(r.Context(), w)
+	contacts, _ := s.DB.ListContacts(r.Context(), mailboxID)
+	templates.ContactsPage(mailboxID, contacts, nil, nil, false).Render(r.Context(), w)
 }
 
 func (s *Server) handleContactToggleFavorite(w http.ResponseWriter, r *http.Request) {
 	user := r.Context().Value("user").(*models.User)
+	mailboxID, _, err := s.getMailboxForUser(r, chi.URLParam(r, "mailboxID"), user.ID)
+	if err != nil {
+		http.Error(w, "Not found", http.StatusNotFound)
+		return
+	}
+
 	contactID, err := uuid.Parse(chi.URLParam(r, "contactID"))
 	if err != nil {
 		http.Error(w, "Invalid ID", http.StatusBadRequest)
 		return
 	}
 
-	if err := s.DB.ToggleContactFavorite(r.Context(), contactID, user.ID); err != nil {
+	if err := s.DB.ToggleContactFavorite(r.Context(), contactID, mailboxID); err != nil {
 		slog.Error("failed to toggle favorite", "contact_id", contactID, "error", err)
 		http.Error(w, "Internal error", http.StatusInternalServerError)
 		return
 	}
 
-	updated, _ := s.DB.GetContactByID(r.Context(), contactID, user.ID)
-	contacts, _ := s.DB.ListContacts(r.Context(), user.ID)
-	var favoriteRecentEmails []models.Email
+	updated, _ := s.DB.GetContactByID(r.Context(), contactID, mailboxID)
+	contacts, _ := s.DB.ListContacts(r.Context(), mailboxID)
+	var recentEmails []models.Email
 	if updated != nil {
-		favoriteRecentEmails, _ = s.DB.GetRecentEmailsByContact(r.Context(), user.ID, updated.Email, 3)
+		recentEmails, _ = s.DB.GetRecentEmailsByContact(r.Context(), mailboxID, updated.Email, 3)
 	}
-	templates.ContactsPage(contacts, updated, favoriteRecentEmails, false).Render(r.Context(), w)
+	templates.ContactsPage(mailboxID, contacts, updated, recentEmails, false).Render(r.Context(), w)
 }
 
 func (s *Server) handleAddContactFromEmail(w http.ResponseWriter, r *http.Request) {
@@ -289,13 +320,13 @@ func (s *Server) handleAddContactFromEmail(w http.ResponseWriter, r *http.Reques
 		}
 	}
 
-	if err := s.DB.UpsertContactFromEmail(r.Context(), user.ID, emailAddr, firstName, lastName); err != nil {
+	if err := s.DB.UpsertContactFromEmail(r.Context(), email.MailboxID, emailAddr, firstName, lastName); err != nil {
 		slog.Error("failed to upsert contact from email", "error", err)
 		http.Error(w, "Internal error", http.StatusInternalServerError)
 		return
 	}
 
-	contacts, _ := s.DB.ListContacts(r.Context(), user.ID)
+	contacts, _ := s.DB.ListContacts(r.Context(), email.MailboxID)
 	var selected *models.Contact
 	for i := range contacts {
 		if contacts[i].Email == emailAddr {
@@ -304,10 +335,11 @@ func (s *Server) handleAddContactFromEmail(w http.ResponseWriter, r *http.Reques
 		}
 	}
 
-	var addRecentEmails []models.Email
+	var recentEmails []models.Email
 	if selected != nil {
-		addRecentEmails, _ = s.DB.GetRecentEmailsByContact(r.Context(), user.ID, selected.Email, 3)
+		recentEmails, _ = s.DB.GetRecentEmailsByContact(r.Context(), email.MailboxID, selected.Email, 3)
 	}
+
 	mailboxes, _ := s.DB.GetMailboxesByUserID(r.Context(), user.ID)
-	s.render(w, r, user, mailboxes, defaultMailboxID(mailboxes), "contacts", nil, templates.ContactsPage(contacts, selected, addRecentEmails, false), "Contacts")
+	s.render(w, r, user, mailboxes, email.MailboxID, "contacts", nil, templates.ContactsPage(email.MailboxID, contacts, selected, recentEmails, false), "Contacts")
 }

@@ -141,7 +141,7 @@ templ EmailDetail(email *models.Email, attachments []models.EmailAttachment, bod
 					<div>
 						<div class="flex items-center space-x-2">
 							if senderContact != nil {
-								<a hx-get={ "/contacts/" + senderContact.ID.String() } hx-target="#main-content" hx-push-url="true" class="font-bold text-teal-600 hover:text-teal-800 hover:underline cursor-pointer">{ senderContact.DisplayName() }</a>
+								<a hx-get={ "/mailbox/" + email.MailboxID.String() + "/contacts?id=" + senderContact.ID.String() } hx-target="#main-content" hx-push-url="true" class="font-bold text-teal-600 hover:text-teal-800 hover:underline cursor-pointer">{ senderContact.DisplayName() }</a>
 							} else {
 								<p class="font-bold text-gray-900">{ email.FromAddress }</p>
 								if !senderBlocked {
@@ -149,7 +149,7 @@ templ EmailDetail(email *models.Email, attachments []models.EmailAttachment, bod
 										type="button"
 										hx-post={ "/email/" + email.ID.String() + "/add-contact" }
 										hx-target="#main-content"
-										hx-push-url="/contacts"
+										hx-push-url={ "/mailbox/" + email.MailboxID.String() + "/contacts" }
 										title="Add to Contacts"
 										class="text-xs text-purple-400 hover:text-purple-600 font-medium transition-colors cursor-pointer"
 									>+ Add to Contacts</button>

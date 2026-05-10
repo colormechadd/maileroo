@@ -9,7 +9,7 @@ import (
 
 type Contact struct {
 	ID             uuid.UUID `db:"id" json:"id"`
-	UserID         uuid.UUID `db:"user_id" json:"user_id"`
+	MailboxID      uuid.UUID `db:"mailbox_id" json:"mailbox_id"`
 	FirstName      string    `db:"first_name" json:"first_name"`
 	LastName       string    `db:"last_name" json:"last_name"`
 	Email          string    `db:"email" json:"email"`
