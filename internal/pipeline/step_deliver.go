@@ -9,6 +9,7 @@ import (
 // Deliver handles both storage and database persistence in one logical step
 func Deliver(ctx context.Context, p *Pipeline, ictx *IngestionContext) (StepStatus, any, error) {
 	email, err := p.mail.Persist(ctx, mail.PersistOptions{
+		EmailID:          ictx.EmailID,
 		MailboxID:        ictx.TargetMailboxID,
 		RawMessage:       ictx.RawMessage,
 		IsOutbound:       false,

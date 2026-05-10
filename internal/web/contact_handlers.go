@@ -1,6 +1,7 @@
 package web
 
 import (
+	"context"
 	"encoding/json"
 	"log/slog"
 	"net/http"
@@ -12,6 +13,14 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
 )
+
+func (s *Server) contactBlocked(ctx context.Context, mailboxID uuid.UUID, c *models.Contact) bool {
+	if c == nil {
+		return false
+	}
+	rule, _ := s.DB.IsBlockedByMailboxRules(ctx, mailboxID, c.Email)
+	return rule != nil
+}
 
 func (s *Server) handleContactsPage(w http.ResponseWriter, r *http.Request) {
 	user := r.Context().Value("user").(*models.User)
@@ -50,7 +59,7 @@ func (s *Server) handleContactsPage(w http.ResponseWriter, r *http.Request) {
 	}
 
 	showNew := r.URL.Query().Get("new") == "1"
-	s.render(w, r, user, mailboxes, mailboxID, "contacts", nil, templates.ContactsPage(mailboxID, contacts, selected, recentEmails, showNew), "Contacts")
+	s.render(w, r, user, mailboxes, mailboxID, "contacts", nil, templates.ContactsPage(mailboxID, contacts, selected, recentEmails, showNew, s.contactBlocked(r.Context(), mailboxID, selected)), "Contacts")
 }
 
 func (s *Server) handleContactView(w http.ResponseWriter, r *http.Request) {
@@ -91,7 +100,7 @@ func (s *Server) handleContactView(w http.ResponseWriter, r *http.Request) {
 		slog.Error("failed to fetch recent emails for contact", "contact_id", contactID, "error", err)
 	}
 
-	s.render(w, r, user, mailboxes, mailboxID, "contacts", nil, templates.ContactsPage(mailboxID, contacts, selected, recentEmails, false), "Contacts")
+	s.render(w, r, user, mailboxes, mailboxID, "contacts", nil, templates.ContactsPage(mailboxID, contacts, selected, recentEmails, false, s.contactBlocked(r.Context(), mailboxID, selected)), "Contacts")
 }
 
 func (s *Server) handleContactSearch(w http.ResponseWriter, r *http.Request) {
@@ -180,7 +189,7 @@ func (s *Server) handleContactCreate(w http.ResponseWriter, r *http.Request) {
 
 	contacts, _ := s.DB.ListContacts(r.Context(), mailboxID)
 	recentEmails, _ := s.DB.GetRecentEmailsByContact(r.Context(), mailboxID, created.Email, 3)
-	templates.ContactsPage(mailboxID, contacts, created, recentEmails, false).Render(r.Context(), w)
+	templates.ContactsPage(mailboxID, contacts, created, recentEmails, false, s.contactBlocked(r.Context(), mailboxID, created)).Render(r.Context(), w)
 }
 
 func (s *Server) handleContactUpdate(w http.ResponseWriter, r *http.Request) {
@@ -235,7 +244,7 @@ func (s *Server) handleContactUpdate(w http.ResponseWriter, r *http.Request) {
 	if updated != nil {
 		recentEmails, _ = s.DB.GetRecentEmailsByContact(r.Context(), mailboxID, updated.Email, 3)
 	}
-	templates.ContactsPage(mailboxID, contacts, updated, recentEmails, false).Render(r.Context(), w)
+	templates.ContactsPage(mailboxID, contacts, updated, recentEmails, false, s.contactBlocked(r.Context(), mailboxID, updated)).Render(r.Context(), w)
 }
 
 func (s *Server) handleContactDelete(w http.ResponseWriter, r *http.Request) {
@@ -259,7 +268,7 @@ func (s *Server) handleContactDelete(w http.ResponseWriter, r *http.Request) {
 	}
 
 	contacts, _ := s.DB.ListContacts(r.Context(), mailboxID)
-	templates.ContactsPage(mailboxID, contacts, nil, nil, false).Render(r.Context(), w)
+	templates.ContactsPage(mailboxID, contacts, nil, nil, false, false).Render(r.Context(), w)
 }
 
 func (s *Server) handleContactToggleFavorite(w http.ResponseWriter, r *http.Request) {
@@ -288,7 +297,7 @@ func (s *Server) handleContactToggleFavorite(w http.ResponseWriter, r *http.Requ
 	if updated != nil {
 		recentEmails, _ = s.DB.GetRecentEmailsByContact(r.Context(), mailboxID, updated.Email, 3)
 	}
-	templates.ContactsPage(mailboxID, contacts, updated, recentEmails, false).Render(r.Context(), w)
+	templates.ContactsPage(mailboxID, contacts, updated, recentEmails, false, s.contactBlocked(r.Context(), mailboxID, updated)).Render(r.Context(), w)
 }
 
 func (s *Server) handleAddContactFromEmail(w http.ResponseWriter, r *http.Request) {
@@ -326,20 +335,6 @@ func (s *Server) handleAddContactFromEmail(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	contacts, _ := s.DB.ListContacts(r.Context(), email.MailboxID)
-	var selected *models.Contact
-	for i := range contacts {
-		if contacts[i].Email == emailAddr {
-			selected = &contacts[i]
-			break
-		}
-	}
-
-	var recentEmails []models.Email
-	if selected != nil {
-		recentEmails, _ = s.DB.GetRecentEmailsByContact(r.Context(), email.MailboxID, selected.Email, 3)
-	}
-
-	mailboxes, _ := s.DB.GetMailboxesByUserID(r.Context(), user.ID)
-	s.render(w, r, user, mailboxes, email.MailboxID, "contacts", nil, templates.ContactsPage(email.MailboxID, contacts, selected, recentEmails, false), "Contacts")
+	contact, _ := s.DB.GetContactByEmail(r.Context(), email.MailboxID, emailAddr)
+	templates.EmailSenderInfo(email, contact, false).Render(r.Context(), w)
 }

@@ -46,6 +46,7 @@ type Email struct {
 	SendingAddressID *uuid.UUID     `db:"sending_address_id" json:"sending_address_id"`
 	UserID           *uuid.UUID     `db:"user_id" json:"user_id,omitempty"`
 	BodyPlain        *string        `db:"body_plain" json:"-"`
+	PurgedDatetime   *time.Time     `db:"purged_datetime" json:"purged_datetime,omitempty"`
 }
 
 type EmailAttachment struct {

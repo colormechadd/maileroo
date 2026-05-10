@@ -134,39 +134,7 @@ templ EmailDetail(email *models.Email, attachments []models.EmailAttachment, bod
 			</div>
 			
 			<div class="flex items-start justify-between">
-				<div class="flex items-center">
-					<div class="h-12 w-12 rounded-full bg-teal-500 flex items-center justify-center text-white font-bold text-lg shadow-sm mr-4">
-						{ getInitials(email.FromAddress) }
-					</div>
-					<div>
-						<div class="flex items-center space-x-2">
-							if senderContact != nil {
-								<a hx-get={ "/mailbox/" + email.MailboxID.String() + "/contacts?id=" + senderContact.ID.String() } hx-target="#main-content" hx-push-url="true" class="font-bold text-teal-600 hover:text-teal-800 hover:underline cursor-pointer">{ senderContact.DisplayName() }</a>
-							} else {
-								<p class="font-bold text-gray-900">{ email.FromAddress }</p>
-								if !senderBlocked {
-									<button
-										type="button"
-										hx-post={ "/email/" + email.ID.String() + "/add-contact" }
-										hx-target="#main-content"
-										hx-push-url={ "/mailbox/" + email.MailboxID.String() + "/contacts" }
-										title="Add to Contacts"
-										class="text-xs text-purple-400 hover:text-purple-600 font-medium transition-colors cursor-pointer"
-									>+ Add to Contacts</button>
-								}
-							}
-							if senderBlocked {
-								<span class="inline-flex items-center gap-1 text-xs font-medium text-red-600 bg-red-50 border border-red-200 rounded-full px-2 py-0.5">
-									<svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-										<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 115.636 5.636m12.728 12.728L5.636 5.636"/>
-									</svg>
-									Blocked
-								</span>
-							}
-						</div>
-						<p class="text-gray-500 text-sm">to { email.ToAddress }</p>
-					</div>
-				</div>
+				@EmailSenderInfo(email, senderContact, senderBlocked)
 				<div class="text-right">
 					<p class="text-gray-500 text-sm font-medium" data-local-time={ email.ReceiveDatetime.Format(time.RFC3339) } data-format="full">
 						{ email.ReceiveDatetime.Format("Jan 02, 2006, 15:04") }
@@ -259,6 +227,42 @@ templ EmailDetail(email *models.Email, attachments []models.EmailAttachment, bod
 				</div>
 			</footer>
 		}
+	</div>
+}
+
+templ EmailSenderInfo(email *models.Email, senderContact *models.Contact, senderBlocked bool) {
+	<div id="sender-info" class="flex items-center">
+		<div class="h-12 w-12 rounded-full bg-teal-500 flex items-center justify-center text-white font-bold text-lg shadow-sm mr-4">
+			{ getInitials(email.FromAddress) }
+		</div>
+		<div>
+			<div class="flex items-center space-x-2">
+				if senderContact != nil {
+					<a hx-get={ "/mailbox/" + email.MailboxID.String() + "/contacts?id=" + senderContact.ID.String() } hx-target="#main-content" hx-push-url="true" class="font-bold text-teal-600 hover:text-teal-800 hover:underline cursor-pointer">{ senderContact.DisplayName() }</a>
+				} else {
+					<p class="font-bold text-gray-900">{ email.FromAddress }</p>
+					if !senderBlocked {
+						<button
+							type="button"
+							hx-post={ "/email/" + email.ID.String() + "/add-contact" }
+							hx-target="#sender-info"
+							hx-swap="outerHTML"
+							title="Add to Contacts"
+							class="text-xs text-purple-400 hover:text-purple-600 font-medium transition-colors cursor-pointer"
+						>+ Add to Contacts</button>
+					}
+				}
+				if senderBlocked {
+					<span class="inline-flex items-center gap-1 text-xs font-medium text-red-600 bg-red-50 border border-red-200 rounded-full px-2 py-0.5">
+						<svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+							<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 115.636 5.636m12.728 12.728L5.636 5.636"/>
+						</svg>
+						Blocked
+					</span>
+				}
+			</div>
+			<p class="text-gray-500 text-sm">to { email.ToAddress }</p>
+		</div>
 	</div>
 }
 

@@ -175,7 +175,8 @@ CREATE TABLE public.email (
     direction public.email_direction NOT NULL,
     status public.email_status DEFAULT 'INBOX'::public.email_status NOT NULL,
     create_datetime timestamp with time zone DEFAULT CURRENT_TIMESTAMP,
-    update_datetime timestamp with time zone DEFAULT CURRENT_TIMESTAMP
+    update_datetime timestamp with time zone DEFAULT CURRENT_TIMESTAMP,
+    purged_datetime timestamp with time zone
 );
 
 
@@ -1076,4 +1077,5 @@ ALTER TABLE ONLY public.webmail_session
 --
 
 INSERT INTO public.schema_migrations (version) VALUES
-    ('20260509000000');
+    ('20260509000000'),
+    ('20260510000000');

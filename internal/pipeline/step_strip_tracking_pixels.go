@@ -5,7 +5,6 @@ import (
 	"context"
 	"io"
 	"log/slog"
-	"strings"
 
 	gomail "github.com/emersion/go-message/mail"
 
@@ -16,7 +15,7 @@ import (
 // from any HTML body part, and updates ictx.RawMessage with the cleaned
 // message before it is stored by the Deliver step.
 func StripTrackingPixels(ctx context.Context, p *Pipeline, ictx *IngestionContext) (StepStatus, any, error) {
-	cleaned, originalHTML, pixels, err := rebuildMessageWithStrippedPixels(ictx.RawMessage)
+	cleaned, _, pixels, err := rebuildMessageWithStrippedPixels(ictx.RawMessage)
 	if err != nil {
 		// Pixels were detected but the message could not be rebuilt. Log what
 		// we found for the pipeline page but leave the stored message unchanged.
@@ -33,12 +32,10 @@ func StripTrackingPixels(ctx context.Context, p *Pipeline, ictx *IngestionContex
 		return StatusSkipped, map[string]any{"removed": 0}, nil
 	}
 
-	// Store the original HTML before overwriting RawMessage so it can be
-	// retrieved for audit purposes. The key is included in the step details
-	// and will appear in the pipeline log page.
-	originalKey := ictx.ID.String() + "/original_html"
-	if err := p.storage.Save(ctx, originalKey, strings.NewReader(originalHTML)); err != nil {
-		slog.Warn("strip_tracking_pixels: could not store original HTML",
+	// Store the original raw email before overwriting RawMessage.
+	originalKey, err := p.mail.StoreOriginalEmail(ctx, ictx.TargetMailboxID, ictx.EmailID, ictx.RawMessage)
+	if err != nil {
+		slog.Warn("strip_tracking_pixels: could not store original email",
 			"ingestion_id", ictx.ID, "error", err)
 		// Non-fatal: continue and strip the pixels even if archival fails.
 		originalKey = ""
@@ -46,9 +43,9 @@ func StripTrackingPixels(ctx context.Context, p *Pipeline, ictx *IngestionContex
 
 	ictx.RawMessage = cleaned
 	return StatusPass, map[string]any{
-		"removed":       len(pixels),
-		"pixels":        pixels,
-		"original_html": originalKey,
+		"removed":      len(pixels),
+		"pixels":       pixels,
+		"original_key": originalKey,
 	}, nil
 }
 

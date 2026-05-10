@@ -130,22 +130,6 @@ func (db *DB) GetContactByEmail(ctx context.Context, mailboxID uuid.UUID, email 
 	return &c, nil
 }
 
-func (db *DB) GetRecentEmailsByContact(ctx context.Context, mailboxID uuid.UUID, contactEmail string, limit int) ([]models.Email, error) {
-	var emails []models.Email
-	err := db.SelectContext(ctx, &emails, `
-		SELECT
-			id, mailbox_id, thread_id, address_mapping_id, ingestion_id, message_id,
-			in_reply_to, "references", subject, from_address, to_address,
-			reply_to_address, storage_key, size, receive_datetime, is_read, is_star, direction, status, sending_address_id, user_id, body_plain
-		FROM email
-		WHERE mailbox_id = $1
-		  AND status != 'DELETED'
-		  AND (lower(from_address) LIKE '%' || lower($2) || '%' OR lower(to_address) LIKE '%' || lower($2) || '%')
-		ORDER BY receive_datetime DESC, id DESC
-		LIMIT $3
-	`, mailboxID, contactEmail, limit)
-	return emails, err
-}
 
 func (db *DB) UpsertContactFromEmail(ctx context.Context, mailboxID uuid.UUID, email, firstName, lastName string) error {
 	_, err := db.ExecContext(ctx, `

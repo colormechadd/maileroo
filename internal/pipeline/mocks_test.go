@@ -28,9 +28,13 @@ func (m *MockDB) UpdateIngestionStatus(ctx context.Context, id uuid.UUID, status
 	return args.Error(0)
 }
 
-func (m *MockDB) IsBlockedByMailboxRules(ctx context.Context, mailboxID uuid.UUID, fromAddress string) (bool, error) {
+func (m *MockDB) IsBlockedByMailboxRules(ctx context.Context, mailboxID uuid.UUID, fromAddress string) (*models.MailboxBlockRule, error) {
 	args := m.Called(ctx, mailboxID, fromAddress)
-	return args.Bool(0), args.Error(1)
+	v := args.Get(0)
+	if v == nil {
+		return nil, args.Error(1)
+	}
+	return v.(*models.MailboxBlockRule), args.Error(1)
 }
 
 func (m *MockDB) CreateEmail(ctx context.Context, email *models.Email) error {

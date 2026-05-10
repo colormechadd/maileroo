@@ -75,12 +75,12 @@ func TestPipelineDB(t *testing.T) {
 		_, err := db.ExecContext(ctx, `INSERT INTO mailbox_block_rule (mailbox_id, address_pattern) VALUES ($1, $2)`, mailboxID, `.*@spam.com`)
 		assert.NoError(t, err)
 
-		blocked, err := db.IsBlockedByMailboxRules(ctx, mailboxID, "bad@spam.com")
+		rule, err := db.IsBlockedByMailboxRules(ctx, mailboxID, "bad@spam.com")
 		assert.NoError(t, err)
-		assert.True(t, blocked)
+		assert.NotNil(t, rule)
 
-		blocked, err = db.IsBlockedByMailboxRules(ctx, mailboxID, "good@friend.com")
+		rule, err = db.IsBlockedByMailboxRules(ctx, mailboxID, "good@friend.com")
 		assert.NoError(t, err)
-		assert.False(t, blocked)
+		assert.Nil(t, rule)
 	})
 }

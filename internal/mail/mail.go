@@ -81,6 +81,7 @@ func NewService(repo Repository, storage storage.Storage, compression string, si
 }
 
 type PersistOptions struct {
+	EmailID          uuid.UUID // pre-generated; a new UUID is created if zero
 	MailboxID        uuid.UUID
 	RawMessage       []byte
 	IsOutbound       bool
@@ -100,8 +101,11 @@ func (s *Service) Persist(ctx context.Context, opts PersistOptions) (*models.Ema
 		return nil, fmt.Errorf("compression failed: %w", err)
 	}
 
-	emailID := uuid.New()
-	storageKey := fmt.Sprintf("%s/%s.eml%s", opts.MailboxID, emailID, suffix)
+	emailID := opts.EmailID
+	if emailID == uuid.Nil {
+		emailID = uuid.New()
+	}
+	storageKey := fmt.Sprintf("%s/%s/processed.eml%s", opts.MailboxID, emailID, suffix)
 
 	// 2. Storage
 	if err := s.storage.Save(ctx, storageKey, bytes.NewReader(data)); err != nil {
@@ -242,7 +246,7 @@ func (s *Service) Persist(ctx context.Context, opts PersistOptions) (*models.Ema
 			}
 
 			attID := uuid.New()
-			attKey := fmt.Sprintf("%s/attachments/%s/%s_%s%s", opts.MailboxID, emailID, attID, filename, aSuffix)
+			attKey := fmt.Sprintf("%s/%s/attachments/%s_%s%s", opts.MailboxID, emailID, attID, filename, aSuffix)
 
 			if err := s.storage.Save(ctx, attKey, bytes.NewReader(cData)); err != nil {
 				slog.Error("failed to save attachment to storage", "email_id", emailID, "filename", filename, "error", err)
@@ -266,6 +270,21 @@ func (s *Service) Persist(ctx context.Context, opts PersistOptions) (*models.Ema
 	}
 
 	return email, nil
+}
+
+// StoreOriginalEmail compresses rawMessage and saves it at
+// {mailboxID}/{emailID}/original.eml{suffix}. It is called by the
+// strip_tracking_pixels pipeline step to preserve the unmodified email.
+func (s *Service) StoreOriginalEmail(ctx context.Context, mailboxID, emailID uuid.UUID, rawMessage []byte) (string, error) {
+	data, suffix, err := s.CompressData(rawMessage, s.compression)
+	if err != nil {
+		return "", fmt.Errorf("compression failed: %w", err)
+	}
+	key := fmt.Sprintf("%s/%s/original.eml%s", mailboxID, emailID, suffix)
+	if err := s.storage.Save(ctx, key, bytes.NewReader(data)); err != nil {
+		return "", fmt.Errorf("storage save failed: %w", err)
+	}
+	return key, nil
 }
 
 func (s *Service) GetCcAddresses(ctx context.Context, email *models.Email) ([]string, error) {

@@ -13,7 +13,7 @@ type PipelineDB interface {
 	CreateIngestion(ctx context.Context, ingestion *models.Ingestion) error
 	CreateIngestionStep(ctx context.Context, step *models.IngestionStep) error
 	UpdateIngestionStatus(ctx context.Context, id uuid.UUID, status string) error
-	IsBlockedByMailboxRules(ctx context.Context, mailboxID uuid.UUID, fromAddress string) (bool, error)
+	IsBlockedByMailboxRules(ctx context.Context, mailboxID uuid.UUID, fromAddress string) (*models.MailboxBlockRule, error)
 	CreateEmail(ctx context.Context, email *models.Email) error
 	SetEmailStatus(ctx context.Context, id uuid.UUID, status models.EmailStatus) error
 	CreateAttachment(ctx context.Context, attachment *models.EmailAttachment) error
@@ -74,19 +74,23 @@ func (db *DB) DeleteBlockRule(ctx context.Context, ruleID, mailboxID uuid.UUID) 
 	return err
 }
 
-func (db *DB) IsBlockedByMailboxRules(ctx context.Context, mailboxID uuid.UUID, fromAddress string) (bool, error) {
-	var count int
-	err := db.GetContext(ctx, &count, `
-		SELECT COUNT(*)
+func (db *DB) IsBlockedByMailboxRules(ctx context.Context, mailboxID uuid.UUID, fromAddress string) (*models.MailboxBlockRule, error) {
+	var rule models.MailboxBlockRule
+	err := db.GetContext(ctx, &rule, `
+		SELECT id, mailbox_id, address_pattern, is_active, user_id
 		FROM mailbox_block_rule
-		WHERE mailbox_id = $1 
-		  AND is_active = TRUE 
+		WHERE mailbox_id = $1
+		  AND is_active = TRUE
 		  AND $2 ~ address_pattern
+		LIMIT 1
 	`, mailboxID, fromAddress)
-	if err != nil {
-		return false, err
+	if err == sql.ErrNoRows {
+		return nil, nil
 	}
-	return count > 0, nil
+	if err != nil {
+		return nil, err
+	}
+	return &rule, nil
 }
 
 func (db *DB) CreateEmail(ctx context.Context, email *models.Email) error {

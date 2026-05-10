@@ -3,11 +3,22 @@ package db
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/colormechadd/mailaroo/pkg/models"
 	"github.com/google/uuid"
 )
+
+// EmailFilter specifies criteria for SearchEmails. Zero values mean no constraint for that field.
+type EmailFilter struct {
+	View        string // mailbox view: "mail", "unread", "read", "starred", "quarantined", "deleted", "sent", "all"
+	From        string // ILIKE match on from_address
+	To          string // ILIKE match on to_address
+	Participant string // ILIKE match on from_address OR to_address
+	Subject     string // ILIKE match on subject
+	Text        string // full-text search via search_vector
+}
 
 type WebDB interface {
 	GetUserByUsername(ctx context.Context, username string) (*models.User, error)
@@ -16,8 +27,7 @@ type WebDB interface {
 	ExpireWebmailSession(ctx context.Context, token string) error
 	GetUserByID(ctx context.Context, id uuid.UUID) (*models.User, error)
 	GetMailboxesByUserID(ctx context.Context, userID uuid.UUID) ([]models.Mailbox, error)
-	GetEmailsByMailboxID(ctx context.Context, mailboxID uuid.UUID, filter string, limit int, cursorTime *time.Time, cursorID *uuid.UUID) ([]models.Email, error)
-	SearchEmailsByMailboxID(ctx context.Context, mailboxID, userID uuid.UUID, query string, limit int, cursorTime *time.Time, cursorID *uuid.UUID) ([]models.Email, error)
+	SearchEmails(ctx context.Context, mailboxID, userID uuid.UUID, f EmailFilter, limit int, cursorTime *time.Time, cursorID *uuid.UUID) ([]models.Email, error)
 	GetEmailByID(ctx context.Context, emailID uuid.UUID) (*models.Email, error)
 	GetEmailByIDForUser(ctx context.Context, emailID, userID uuid.UUID) (*models.Email, error)
 	GetAttachmentsByEmailID(ctx context.Context, emailID uuid.UUID) ([]models.EmailAttachment, error)
@@ -55,12 +65,12 @@ type WebDB interface {
 	DeleteContact(ctx context.Context, contactID, mailboxID uuid.UUID) error
 	ToggleContactFavorite(ctx context.Context, contactID, mailboxID uuid.UUID) error
 	UpsertContactFromEmail(ctx context.Context, mailboxID uuid.UUID, email, firstName, lastName string) error
-	GetRecentEmailsByContact(ctx context.Context, mailboxID uuid.UUID, contactEmail string, limit int) ([]models.Email, error)
+
 
 	CreateBlockRule(ctx context.Context, mailboxID uuid.UUID, userID uuid.UUID, addressPattern string) error
 	ListBlockRules(ctx context.Context, mailboxID uuid.UUID) ([]*models.MailboxBlockRule, error)
 	DeleteBlockRule(ctx context.Context, ruleID, mailboxID uuid.UUID) error
-	IsBlockedByMailboxRules(ctx context.Context, mailboxID uuid.UUID, fromAddress string) (bool, error)
+	IsBlockedByMailboxRules(ctx context.Context, mailboxID uuid.UUID, fromAddress string) (*models.MailboxBlockRule, error)
 
 	GetMailboxUsers(ctx context.Context, mailboxID uuid.UUID) ([]models.User, error)
 	GetSendingAddressesByMailboxID(ctx context.Context, mailboxID uuid.UUID) ([]models.SendingAddress, error)
@@ -109,57 +119,87 @@ func (db *DB) GetMailboxesByUserID(ctx context.Context, userID uuid.UUID) ([]mod
 	return mailboxes, err
 }
 
-func (db *DB) GetEmailsByMailboxID(ctx context.Context, mailboxID uuid.UUID, filter string, limit int, cursorTime *time.Time, cursorID *uuid.UUID) ([]models.Email, error) {
-	var emails []models.Email
-	whereClause := "mailbox_id = $1 AND status = 'INBOX' AND direction = 'INBOUND'"
+func (db *DB) SearchEmails(ctx context.Context, mailboxID, userID uuid.UUID, f EmailFilter, limit int, cursorTime *time.Time, cursorID *uuid.UUID) ([]models.Email, error) {
+	args := []interface{}{mailboxID, userID}
+	conditions := []string{
+		"e.mailbox_id = $1",
+		"mu.user_id = $2",
+		"mu.is_active = TRUE",
+	}
 
-	switch filter {
+	switch f.View {
 	case "unread":
-		whereClause = "mailbox_id = $1 AND is_read = FALSE AND status = 'INBOX' AND direction = 'INBOUND'"
+		conditions = append(conditions, "e.is_read = FALSE", "e.status = 'INBOX'", "e.direction = 'INBOUND'")
 	case "read":
-		whereClause = "mailbox_id = $1 AND is_read = TRUE AND status = 'INBOX' AND direction = 'INBOUND'"
+		conditions = append(conditions, "e.is_read = TRUE", "e.status = 'INBOX'", "e.direction = 'INBOUND'")
 	case "starred":
-		whereClause = "mailbox_id = $1 AND is_star = TRUE AND status != 'DELETED'"
+		conditions = append(conditions, "e.is_star = TRUE", "e.status != 'DELETED'")
 	case "quarantined":
-		whereClause = "mailbox_id = $1 AND status = 'QUARANTINED'"
+		conditions = append(conditions, "e.status = 'QUARANTINED'")
 	case "deleted":
-		whereClause = "mailbox_id = $1 AND status = 'DELETED'"
+		conditions = append(conditions, "e.status = 'DELETED'")
 	case "sent":
-		whereClause = "mailbox_id = $1 AND direction = 'OUTBOUND' AND status != 'DELETED'"
+		conditions = append(conditions, "e.direction = 'OUTBOUND'", "e.status != 'DELETED'")
 	case "all":
-		whereClause = "mailbox_id = $1 AND status = 'INBOX'"
+		conditions = append(conditions, "e.status = 'INBOX'")
+	case "mail":
+		conditions = append(conditions, "e.status = 'INBOX'", "e.direction = 'INBOUND'")
+	default:
+		conditions = append(conditions, "e.status != 'DELETED'")
 	}
 
-	var query string
-	var args []any
+	next := func() int { return len(args) + 1 }
+
+	if f.From != "" {
+		conditions = append(conditions, fmt.Sprintf("e.from_address ILIKE $%d", next()))
+		args = append(args, "%"+f.From+"%")
+	}
+	if f.To != "" {
+		conditions = append(conditions, fmt.Sprintf("e.to_address ILIKE $%d", next()))
+		args = append(args, "%"+f.To+"%")
+	}
+	if f.Participant != "" {
+		n := next()
+		conditions = append(conditions, fmt.Sprintf("(e.from_address ILIKE $%d OR e.to_address ILIKE $%d)", n, n))
+		args = append(args, "%"+f.Participant+"%")
+	}
+	if f.Subject != "" {
+		conditions = append(conditions, fmt.Sprintf("e.subject ILIKE $%d", next()))
+		args = append(args, "%"+f.Subject+"%")
+	}
+	if f.Text != "" {
+		conditions = append(conditions, fmt.Sprintf("e.search_vector @@ plainto_tsquery('english', $%d)", next()))
+		args = append(args, f.Text)
+	}
+
+	where := strings.Join(conditions, "\n  AND ")
+
+	limitN := next()
+	args = append(args, limit)
+
+	var cursorClause string
 	if cursorTime != nil && cursorID != nil {
-		query = fmt.Sprintf(`
-			SELECT
-				id, mailbox_id, thread_id, address_mapping_id, ingestion_id, message_id,
-				in_reply_to, "references", subject, from_address, to_address,
-				reply_to_address, storage_key, size, receive_datetime, is_read, is_star, direction, status, sending_address_id, user_id, body_plain
-			FROM email
-			WHERE %s
-			  AND (receive_datetime, id) < ($2, $3)
-			ORDER BY receive_datetime DESC, id DESC
-			LIMIT $4
-		`, whereClause)
-		args = []any{mailboxID, cursorTime, cursorID, limit}
-	} else {
-		query = fmt.Sprintf(`
-			SELECT
-				id, mailbox_id, thread_id, address_mapping_id, ingestion_id, message_id,
-				in_reply_to, "references", subject, from_address, to_address,
-				reply_to_address, storage_key, size, receive_datetime, is_read, is_star, direction, status, sending_address_id, user_id, body_plain
-			FROM email
-			WHERE %s
-			ORDER BY receive_datetime DESC, id DESC
-			LIMIT $2
-		`, whereClause)
-		args = []any{mailboxID, limit}
+		n := next()
+		cursorClause = fmt.Sprintf("AND (e.receive_datetime, e.id) < ($%d, $%d)", n, n+1)
+		args = append(args, cursorTime, cursorID)
 	}
 
-	err := db.SelectContext(ctx, &emails, query, args...)
+	sql := fmt.Sprintf(`
+		SELECT
+			e.id, e.mailbox_id, e.thread_id, e.address_mapping_id, e.ingestion_id, e.message_id,
+			e.in_reply_to, e."references", e.subject, e.from_address, e.to_address,
+			e.reply_to_address, e.storage_key, e.size, e.receive_datetime, e.is_read, e.is_star,
+			e.direction, e.status, e.sending_address_id, e.user_id, e.body_plain
+		FROM email e
+		JOIN mailbox_user mu ON e.mailbox_id = mu.mailbox_id
+		WHERE %s
+		%s
+		ORDER BY e.receive_datetime DESC, e.id DESC
+		LIMIT $%d
+	`, where, cursorClause, limitN)
+
+	var emails []models.Email
+	err := db.SelectContext(ctx, &emails, sql, args...)
 	return emails, err
 }
 
@@ -360,44 +400,3 @@ func (db *DB) GetSendingAddressesByMailboxID(ctx context.Context, mailboxID uuid
 	return addresses, err
 }
 
-func (db *DB) SearchEmailsByMailboxID(ctx context.Context, mailboxID, userID uuid.UUID, query string, limit int, cursorTime *time.Time, cursorID *uuid.UUID) ([]models.Email, error) {
-	var emails []models.Email
-	var err error
-	if cursorTime != nil && cursorID != nil {
-		err = db.SelectContext(ctx, &emails, `
-			SELECT
-				e.id, e.mailbox_id, e.thread_id, e.address_mapping_id, e.ingestion_id, e.message_id,
-				e.in_reply_to, e."references", e.subject, e.from_address, e.to_address,
-				e.reply_to_address, e.storage_key, e.size, e.receive_datetime, e.is_read, e.is_star,
-				e.direction, e.status, e.sending_address_id, e.user_id, e.body_plain
-			FROM email e
-			JOIN mailbox_user mu ON e.mailbox_id = mu.mailbox_id
-			WHERE e.mailbox_id = $1
-			  AND mu.user_id = $2
-			  AND mu.is_active = TRUE
-			  AND e.status != 'DELETED'
-			  AND e.search_vector @@ plainto_tsquery('english', $3)
-			  AND (e.receive_datetime, e.id) < ($5, $6)
-			ORDER BY e.receive_datetime DESC, e.id DESC
-			LIMIT $4
-		`, mailboxID, userID, query, limit, cursorTime, cursorID)
-	} else {
-		err = db.SelectContext(ctx, &emails, `
-			SELECT
-				e.id, e.mailbox_id, e.thread_id, e.address_mapping_id, e.ingestion_id, e.message_id,
-				e.in_reply_to, e."references", e.subject, e.from_address, e.to_address,
-				e.reply_to_address, e.storage_key, e.size, e.receive_datetime, e.is_read, e.is_star,
-				e.direction, e.status, e.sending_address_id, e.user_id, e.body_plain
-			FROM email e
-			JOIN mailbox_user mu ON e.mailbox_id = mu.mailbox_id
-			WHERE e.mailbox_id = $1
-			  AND mu.user_id = $2
-			  AND mu.is_active = TRUE
-			  AND e.status != 'DELETED'
-			  AND e.search_vector @@ plainto_tsquery('english', $3)
-			ORDER BY e.receive_datetime DESC, e.id DESC
-			LIMIT $4
-		`, mailboxID, userID, query, limit)
-	}
-	return emails, err
-}

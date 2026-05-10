@@ -7,6 +7,7 @@ import (
 	"io"
 	"log/slog"
 	"net"
+	"strings"
 	"sync"
 	"time"
 
@@ -174,6 +175,7 @@ func (s *Session) Data(r io.Reader) error {
 	for _, rcpt := range s.to {
 		ictx := &pipeline.IngestionContext{
 			ID:               uuid.New(),
+			EmailID:          uuid.New(),
 			RemoteIP:         s.remoteIP,
 			FromAddress:      s.from,
 			ToAddresses:      []string{rcpt.Address},
@@ -205,8 +207,8 @@ func (s *Session) Logout() error {
 	return nil
 }
 
-// StartServers initializes and starts the SMTP servers on the configured ports
-func StartServers(cfg config.SMTPConfig, rateCfg config.RateLimitConfig, mailDB db.MailDB, rateLimitDB db.RateLimitDB, p *pipeline.Pipeline) ([]*gosmtp.Server, error) {
+// CreateServers initializes and starts the SMTP servers on the configured ports
+func CreateServers(cfg config.SMTPConfig, rateCfg config.RateLimitConfig, mailDB db.MailDB, rateLimitDB db.RateLimitDB, p *pipeline.Pipeline) ([]*gosmtp.Server, error) {
 	var servers []*gosmtp.Server
 	be := &Backend{
 		cfg:         cfg,
@@ -245,4 +247,29 @@ func StartServers(cfg config.SMTPConfig, rateCfg config.RateLimitConfig, mailDB 
 	}
 
 	return servers, nil
+}
+
+func StartServer(srv *gosmtp.Server) error {
+	tlsStatus := "disabled"
+	if srv.TLSConfig != nil {
+		tlsStatus = "enabled"
+	}
+	slog.Info("Starting SMTP server", "addr", srv.Addr, "starttls", tlsStatus)
+
+	var err error
+	if strings.HasSuffix(srv.Addr, ":465") || strings.HasSuffix(srv.Addr, ":4650") {
+		if srv.TLSConfig == nil {
+			slog.Error("Implicit TLS requested but no certificates provided. Skipping port.", "addr", srv.Addr)
+			return err
+		}
+		slog.Info("Using implicit TLS for port", "addr", srv.Addr)
+		err = srv.ListenAndServeTLS()
+	} else {
+		err = srv.ListenAndServe()
+	}
+
+	if err != nil {
+		slog.Error("SMTP server failed", "addr", srv.Addr, "error", err)
+	}
+	return err
 }
