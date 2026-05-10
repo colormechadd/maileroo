@@ -5,7 +5,7 @@ import (
 	"time"
 )
 
-templ ContactsPage(contacts []models.Contact, selected *models.Contact, recentEmails []models.Email) {
+templ ContactsPage(contacts []models.Contact, selected *models.Contact, recentEmails []models.Email, showNew bool) {
 	<div class="flex-1 flex h-full overflow-hidden animate-in fade-in duration-300">
 		<!-- Contact List -->
 		<div class="w-80 flex-shrink-0 border-r border-purple-100 flex flex-col bg-white">
@@ -100,8 +100,17 @@ templ ContactsPage(contacts []models.Contact, selected *models.Contact, recentEm
 		<div class="flex-1 flex flex-col bg-white overflow-y-auto">
 			if selected != nil {
 				@contactEditForm(selected, recentEmails, false)
-			} else {
+			} else if showNew {
 				@contactNewForm()
+			} else {
+				<div class="flex flex-col items-center justify-center h-full text-center px-8 text-gray-300 space-y-4">
+					<div class="h-20 w-20 bg-gray-50 rounded-full flex items-center justify-center">
+						<svg class="h-10 w-10 opacity-40" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+							<path stroke-linecap="round" stroke-linejoin="round" stroke-width="1" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/>
+						</svg>
+					</div>
+					<p class="text-sm font-medium">Select a contact or create a new one</p>
+				</div>
 			}
 		</div>
 	</div>

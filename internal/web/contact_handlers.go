@@ -49,7 +49,7 @@ func (s *Server) handleContactView(w http.ResponseWriter, r *http.Request) {
 	}
 
 	mailboxes, _ := s.DB.GetMailboxesByUserID(r.Context(), user.ID)
-	s.render(w, r, user, mailboxes, defaultMailboxID(mailboxes), "contacts", nil, templates.ContactsPage(contacts, selected, recentEmails), "Contacts")
+	s.render(w, r, user, mailboxes, defaultMailboxID(mailboxes), "contacts", nil, templates.ContactsPage(contacts, selected, recentEmails, false), "Contacts")
 }
 
 func (s *Server) handleContactsPage(w http.ResponseWriter, r *http.Request) {
@@ -84,7 +84,7 @@ func (s *Server) handleContactsPage(w http.ResponseWriter, r *http.Request) {
 	}
 
 	mailboxes, _ := s.DB.GetMailboxesByUserID(r.Context(), user.ID)
-	s.render(w, r, user, mailboxes, defaultMailboxID(mailboxes), "contacts", nil, templates.ContactsPage(contacts, selected, recentEmails), "Contacts")
+	s.render(w, r, user, mailboxes, defaultMailboxID(mailboxes), "contacts", nil, templates.ContactsPage(contacts, selected, recentEmails, false), "Contacts")
 }
 
 func (s *Server) handleContactSearch(w http.ResponseWriter, r *http.Request) {
@@ -167,7 +167,7 @@ func (s *Server) handleContactCreate(w http.ResponseWriter, r *http.Request) {
 
 	contacts, _ := s.DB.ListContacts(r.Context(), user.ID)
 	recentEmails, _ := s.DB.GetRecentEmailsByContact(r.Context(), user.ID, created.Email, 3)
-	templates.ContactsPage(contacts, created, recentEmails).Render(r.Context(), w)
+	templates.ContactsPage(contacts, created, recentEmails, false).Render(r.Context(), w)
 }
 
 func (s *Server) handleContactUpdate(w http.ResponseWriter, r *http.Request) {
@@ -216,7 +216,7 @@ func (s *Server) handleContactUpdate(w http.ResponseWriter, r *http.Request) {
 	if updated != nil {
 		updateRecentEmails, _ = s.DB.GetRecentEmailsByContact(r.Context(), user.ID, updated.Email, 3)
 	}
-	templates.ContactsPage(contacts, updated, updateRecentEmails).Render(r.Context(), w)
+	templates.ContactsPage(contacts, updated, updateRecentEmails, false).Render(r.Context(), w)
 }
 
 func (s *Server) handleContactDelete(w http.ResponseWriter, r *http.Request) {
@@ -234,7 +234,7 @@ func (s *Server) handleContactDelete(w http.ResponseWriter, r *http.Request) {
 	}
 
 	contacts, _ := s.DB.ListContacts(r.Context(), user.ID)
-	templates.ContactsPage(contacts, nil, nil).Render(r.Context(), w)
+	templates.ContactsPage(contacts, nil, nil, false).Render(r.Context(), w)
 }
 
 func (s *Server) handleContactToggleFavorite(w http.ResponseWriter, r *http.Request) {
@@ -257,7 +257,7 @@ func (s *Server) handleContactToggleFavorite(w http.ResponseWriter, r *http.Requ
 	if updated != nil {
 		favoriteRecentEmails, _ = s.DB.GetRecentEmailsByContact(r.Context(), user.ID, updated.Email, 3)
 	}
-	templates.ContactsPage(contacts, updated, favoriteRecentEmails).Render(r.Context(), w)
+	templates.ContactsPage(contacts, updated, favoriteRecentEmails, false).Render(r.Context(), w)
 }
 
 func (s *Server) handleAddContactFromEmail(w http.ResponseWriter, r *http.Request) {
@@ -309,5 +309,5 @@ func (s *Server) handleAddContactFromEmail(w http.ResponseWriter, r *http.Reques
 		addRecentEmails, _ = s.DB.GetRecentEmailsByContact(r.Context(), user.ID, selected.Email, 3)
 	}
 	mailboxes, _ := s.DB.GetMailboxesByUserID(r.Context(), user.ID)
-	s.render(w, r, user, mailboxes, defaultMailboxID(mailboxes), "contacts", nil, templates.ContactsPage(contacts, selected, addRecentEmails), "Contacts")
+	s.render(w, r, user, mailboxes, defaultMailboxID(mailboxes), "contacts", nil, templates.ContactsPage(contacts, selected, addRecentEmails, false), "Contacts")
 }
