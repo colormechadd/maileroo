@@ -47,6 +47,8 @@ type WebDB interface {
 	UpdateSendingAddressDisplayName(ctx context.Context, id, userID uuid.UUID, displayName string) error
 
 	InsertOutboundJob(ctx context.Context, emailID *uuid.UUID, fromAddress string, recipients []string, rawMessage []byte) (*models.OutboundJob, error)
+	GetOutboundJobsByEmailID(ctx context.Context, emailID uuid.UUID) ([]models.OutboundJob, error)
+	GetOutboundJobAttemptsByJobID(ctx context.Context, jobID uuid.UUID) ([]models.OutboundJobAttempt, error)
 
 	CreateDraft(ctx context.Context, draft models.Draft) (*models.Draft, error)
 	UpdateDraft(ctx context.Context, draft models.Draft) error

@@ -72,10 +72,11 @@ type Config struct {
 	} `mapstructure:"DKIM"`
 
 	Web struct {
-		CSRFAuthKey string `mapstructure:"CSRF_AUTH_KEY"`
-		TrustProxy  bool   `mapstructure:"TRUST_PROXY"`
-		CertFile    string `mapstructure:"CERT_FILE"`
-		CertKeyFile string `mapstructure:"CERT_KEY_FILE"`
+		CSRFAuthKey              string `mapstructure:"CSRF_AUTH_KEY"`
+		TrustProxy               bool   `mapstructure:"TRUST_PROXY"`
+		CertFile                 string `mapstructure:"CERT_FILE"`
+		CertKeyFile              string `mapstructure:"CERT_KEY_FILE"`
+		SessionExpirationSeconds int    `mapstructure:"SESSION_EXPIRATION_SECONDS"`
 	} `mapstructure:"WEB"`
 
 	LocalStorage LocalStorageConfig `mapstructure:"LOCAL_STORAGE"`
@@ -92,9 +93,9 @@ func LoadConfig() (*Config, error) {
 
 	viper.SetDefault("WEB_PORT", 8080)
 	viper.SetDefault("WEB.TRUST_PROXY", false)
-	viper.SetDefault("WEB.CSRF_SECURE", true)
 	viper.SetDefault("WEB.CERT_FILE", "")
 	viper.SetDefault("WEB.CERT_KEY_FILE", "")
+	viper.SetDefault("WEB.SESSION_EXPIRATION_SECONDS", 86400*24*30)
 	viper.SetDefault("SMTP.PORTS", []int{25})
 	viper.SetDefault("SMTP.DOMAIN", "localhost")
 	viper.SetDefault("SMTP.READ_TIMEOUT", 10*time.Second)
@@ -192,6 +193,9 @@ func BindFlags(fs *pflag.FlagSet) {
 
 	fs.Bool("web-trust-proxy", false, "Trust X-Forwarded-For / X-Real-IP headers from a reverse proxy")
 	viper.BindPFlag("WEB.TRUST_PROXY", fs.Lookup("web-trust-proxy"))
+
+	fs.String("web-session-expiration-seconds", "", "Duration of session cookie in seconds")
+	viper.BindPFlag("WEB.SESSION_EXPIRATION_SECONDS", fs.Lookup("web-session-expiration-seconds"))
 
 	fs.String("log-level", "info", "Log level (debug, info, warn, error)")
 	viper.BindPFlag("LOG.LEVEL", fs.Lookup("log-level"))

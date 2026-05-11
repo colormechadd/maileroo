@@ -2,6 +2,7 @@ package db
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
 	"fmt"
 	"time"
@@ -141,6 +142,14 @@ func (db *DB) UpdateOutboundJobFailed(ctx context.Context, id uuid.UUID, lastErr
 	return err
 }
 
+func (db *DB) InsertOutboundJobAttempt(ctx context.Context, jobID uuid.UUID, attemptNumber int, outcome string, serverResponse *string) error {
+	_, err := db.ExecContext(ctx, `
+		INSERT INTO outbound_job_attempt (job_id, attempt_number, outcome, server_response)
+		VALUES ($1, $2, $3, $4)
+	`, jobID, attemptNumber, outcome, serverResponse)
+	return err
+}
+
 func (db *DB) UpdateOutboundJobDeferred(ctx context.Context, id uuid.UUID, lastError string, attemptCount int, nextAttemptAt time.Time) error {
 	_, err := db.ExecContext(ctx, `
 		UPDATE outbound_job
@@ -148,4 +157,67 @@ func (db *DB) UpdateOutboundJobDeferred(ctx context.Context, id uuid.UUID, lastE
 		WHERE id = $1
 	`, id, lastError, attemptCount, nextAttemptAt)
 	return err
+}
+
+func (db *DB) GetOutboundJobsByEmailID(ctx context.Context, emailID uuid.UUID) ([]models.OutboundJob, error) {
+	var rows []outboundJobRow
+	err := db.SelectContext(ctx, &rows, `
+		SELECT id, email_id, from_address, recipients, raw_message, status, attempt_count, max_attempts, last_error, next_attempt_datetime, delivery_datetime
+		FROM outbound_job
+		WHERE email_id = $1
+		ORDER BY id ASC
+	`, emailID)
+	if err != nil {
+		return nil, err
+	}
+	jobs := make([]models.OutboundJob, 0, len(rows))
+	for i := range rows {
+		job, err := rows[i].toModel()
+		if err != nil {
+			return nil, err
+		}
+		jobs = append(jobs, job)
+	}
+	return jobs, nil
+}
+
+type outboundJobAttemptRow struct {
+	ID              uuid.UUID      `db:"id"`
+	JobID           uuid.UUID      `db:"job_id"`
+	AttemptNumber   int            `db:"attempt_number"`
+	Outcome         string         `db:"outcome"`
+	ServerResponse  sql.NullString `db:"server_response"`
+	AttemptDatetime time.Time      `db:"attempt_datetime"`
+}
+
+func (r *outboundJobAttemptRow) toModel() models.OutboundJobAttempt {
+	a := models.OutboundJobAttempt{
+		ID:              r.ID,
+		JobID:           r.JobID,
+		AttemptNumber:   r.AttemptNumber,
+		Outcome:         r.Outcome,
+		AttemptDatetime: r.AttemptDatetime,
+	}
+	if r.ServerResponse.Valid {
+		a.ServerResponse = &r.ServerResponse.String
+	}
+	return a
+}
+
+func (db *DB) GetOutboundJobAttemptsByJobID(ctx context.Context, jobID uuid.UUID) ([]models.OutboundJobAttempt, error) {
+	var rows []outboundJobAttemptRow
+	err := db.SelectContext(ctx, &rows, `
+		SELECT id, job_id, attempt_number, outcome, server_response, attempt_datetime
+		FROM outbound_job_attempt
+		WHERE job_id = $1
+		ORDER BY attempt_number ASC
+	`, jobID)
+	if err != nil {
+		return nil, err
+	}
+	attempts := make([]models.OutboundJobAttempt, len(rows))
+	for i := range rows {
+		attempts[i] = rows[i].toModel()
+	}
+	return attempts, nil
 }

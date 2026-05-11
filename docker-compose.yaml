@@ -5,7 +5,6 @@ services:
     environment:
       MAILAROO_DATABASE_URL: postgres://${DB_USER:-mailaroo}:${DB_PASS:-mailaroo_pass}@db:5432/${DB_NAME:-mailaroo}?sslmode=disable
       MAILAROO_WEB_PORT: 8080
-      MAILAROO_WEB_CSRF_SECURE: false
       MAILAROO_LOG_LEVEL: info
       MAILAROO_STORAGE_TYPE: local
       MAILAROO_LOCAL_STORAGE_BASE_PATH: /app/data/emails

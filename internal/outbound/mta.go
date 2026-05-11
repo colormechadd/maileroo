@@ -174,7 +174,14 @@ func (m *MTA) SendMessage(msg Message) ([]byte, error) {
 	return raw, nil
 }
 
+// Send delivers a message and discards the server response text.
 func (m *MTA) Send(from string, to []string, msg []byte) error {
+	_, err := m.SendWithResponse(from, to, msg)
+	return err
+}
+
+// SendWithResponse delivers a message and returns the SMTP server's response text (e.g. "250 OK").
+func (m *MTA) SendWithResponse(from string, to []string, msg []byte) (string, error) {
 	if m.relay != "" {
 		slog.Debug("delivering via relay", "relay", m.relay)
 		return m.deliverToRelay(m.relay, from, to, msg)
@@ -191,36 +198,67 @@ func (m *MTA) Send(from string, to []string, msg []byte) error {
 		domains[domain] = append(domains[domain], rcpt)
 	}
 
-	var errs []error
+	var (
+		lastResp string
+		errs     []error
+	)
 	for domain, recipients := range domains {
-		if err := m.deliverToDomain(domain, from, recipients, msg); err != nil {
+		resp, err := m.deliverToDomain(domain, from, recipients, msg)
+		if err != nil {
 			slog.Error("failed to deliver email", "domain", domain, "error", err)
 			errs = append(errs, err)
+		} else {
+			lastResp = resp
 		}
 	}
 
 	if len(errs) > 0 {
-		return fmt.Errorf("failed to deliver to some recipients: %v", errs)
+		return "", fmt.Errorf("failed to deliver to some recipients: %v", errs)
 	}
-	return nil
+	return lastResp, nil
 }
 
-func (m *MTA) deliverToRelay(address string, from string, to []string, msg []byte) error {
+// sendDataCapture sends the DATA command and message body, returning the server's 250 response text.
+// net/smtp's standard Data()/Close() path consumes the 250 response internally without exposing it,
+// so we drive the DATA sequence manually via c.Text to capture it.
+func sendDataCapture(c *smtp.Client, data []byte) (string, error) {
+	if err := c.Text.PrintfLine("DATA"); err != nil {
+		return "", err
+	}
+	if _, _, err := c.Text.ReadResponse(354); err != nil {
+		return "", err
+	}
+	w := c.Text.DotWriter()
+	if _, err := w.Write(data); err != nil {
+		w.Close()
+		return "", err
+	}
+	if err := w.Close(); err != nil {
+		return "", err
+	}
+	code, msg, err := c.Text.ReadResponse(250)
+	if err != nil {
+		return "", err
+	}
+	return fmt.Sprintf("%d %s", code, msg), nil
+}
+
+func (m *MTA) deliverToRelay(address string, from string, to []string, msg []byte) (string, error) {
 	conn, err := net.DialTimeout("tcp", address, 30*time.Second)
 	if err != nil {
-		return fmt.Errorf("relay connection failed: %w", err)
+		return "", fmt.Errorf("relay connection failed: %w", err)
 	}
 	defer conn.Close()
 
 	host, _, _ := net.SplitHostPort(address)
 	c, err := smtp.NewClient(conn, host)
 	if err != nil {
-		return fmt.Errorf("relay smtp client: %w", err)
+		return "", fmt.Errorf("relay smtp client: %w", err)
 	}
 	defer c.Close()
 
 	if err := c.Hello(m.hostname); err != nil {
-		return err
+		return "", err
 	}
 
 	if ok, _ := c.Extension("STARTTLS"); ok {
@@ -231,31 +269,25 @@ func (m *MTA) deliverToRelay(address string, from string, to []string, msg []byt
 	}
 
 	if err := c.Mail(from); err != nil {
-		return err
+		return "", err
 	}
 	for _, rcpt := range to {
 		if err := c.Rcpt(rcpt); err != nil {
 			slog.Warn("relay rejected recipient", "rcpt", rcpt, "error", err)
 		}
 	}
-	w, err := c.Data()
+	resp, err := sendDataCapture(c, msg)
 	if err != nil {
-		return err
-	}
-	if _, err := w.Write(msg); err != nil {
-		return err
-	}
-	if err := w.Close(); err != nil {
-		return err
+		return "", err
 	}
 	c.Quit()
-	return nil
+	return resp, nil
 }
 
-func (m *MTA) deliverToDomain(domain string, from string, to []string, msg []byte) error {
+func (m *MTA) deliverToDomain(domain string, from string, to []string, msg []byte) (string, error) {
 	mxs, err := net.LookupMX(domain)
 	if err != nil {
-		return fmt.Errorf("mx lookup failed: %w", err)
+		return "", fmt.Errorf("mx lookup failed: %w", err)
 	}
 	if len(mxs) == 0 {
 		mxs = []*net.MX{{Host: domain, Pref: 0}}
@@ -304,25 +336,15 @@ func (m *MTA) deliverToDomain(domain string, from string, to []string, msg []byt
 			}
 		}
 
-		w, err := c.Data()
+		resp, err := sendDataCapture(c, msg)
 		if err != nil {
 			lastErr = err
 			continue
 		}
 
-		if _, err := w.Write(msg); err != nil {
-			lastErr = err
-			continue
-		}
-
-		if err := w.Close(); err != nil {
-			lastErr = err
-			continue
-		}
-
 		c.Quit()
-		return nil
+		return resp, nil
 	}
 
-	return fmt.Errorf("all MX records failed, last error: %w", lastErr)
+	return "", fmt.Errorf("all MX records failed, last error: %w", lastErr)
 }

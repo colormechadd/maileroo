@@ -1,0 +1,131 @@
+package templates
+
+import (
+	"fmt"
+	"github.com/colormechadd/mailaroo/pkg/models"
+	"strings"
+)
+
+type OutboundJobDetail struct {
+	Job      models.OutboundJob
+	Attempts []models.OutboundJobAttempt
+}
+
+templ EmailOutboundPipeline(email *models.Email, jobs []OutboundJobDetail) {
+	<div class="flex-1 flex flex-col h-full bg-white overflow-hidden animate-in fade-in duration-300">
+		<header class="px-8 py-6 border-b border-purple-100 flex items-center justify-between">
+			<div class="flex items-center">
+				<button class="mr-4 text-purple-600 hover:text-purple-800 transition-colors cursor-pointer" hx-get={ "/email/" + email.ID.String() } hx-target="#main-content" hx-push-url="true" title="Back to email">
+					<svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+					</svg>
+				</button>
+				<h1 class="text-xl font-bold text-gray-900 truncate">Delivery Pipeline</h1>
+			</div>
+			<button class="text-gray-400 hover:text-gray-600 transition-colors cursor-pointer p-2 hover:bg-gray-100 rounded-full" hx-get={ "/email/" + email.ID.String() } hx-target="#main-content" hx-push-url="true" title="Close">
+				<svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+					<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+				</svg>
+			</button>
+		</header>
+
+		<div class="flex-1 overflow-y-auto p-8">
+			<div class="max-w-3xl mx-auto space-y-8">
+				if len(jobs) == 0 {
+					<div class="text-center py-12 text-gray-500 bg-gray-50 rounded-xl border-2 border-dashed border-gray-200">
+						<p>No outbound delivery job found for this email.</p>
+					</div>
+				} else {
+					for _, detail := range jobs {
+						<div class="border border-purple-100 rounded-xl overflow-hidden shadow-sm">
+							<!-- Job header -->
+							<div class="bg-gray-50 px-5 py-4 flex items-center justify-between border-b border-purple-100">
+								<div class="space-y-1">
+									<div class="flex items-center gap-3">
+										<span class={ "px-2 py-0.5 rounded text-[10px] font-bold uppercase",
+											templ.KV("bg-green-100 text-green-700", detail.Job.Status == models.OutboundDelivered),
+											templ.KV("bg-yellow-100 text-yellow-700", detail.Job.Status == models.OutboundDeferred),
+											templ.KV("bg-red-100 text-red-700", detail.Job.Status == models.OutboundFailed),
+											templ.KV("bg-blue-100 text-blue-700", detail.Job.Status == models.OutboundSending),
+											templ.KV("bg-gray-100 text-gray-700", detail.Job.Status == models.OutboundQueued) }>
+											{ string(detail.Job.Status) }
+										</span>
+										<span class="text-xs text-gray-400 font-mono">
+											{ fmt.Sprintf("%d / %d attempts", detail.Job.AttemptCount, detail.Job.MaxAttempts) }
+										</span>
+									</div>
+									<p class="text-xs text-gray-500">
+										To: { strings.Join(detail.Job.Recipients, ", ") }
+									</p>
+								</div>
+								if detail.Job.DeliveryDatetime != nil {
+									<span class="text-xs text-gray-400" data-local-time={ detail.Job.DeliveryDatetime.Format("2006-01-02T15:04:05Z07:00") } data-format="detail">
+										{ detail.Job.DeliveryDatetime.Format("Jan 02, 15:04") }
+									</span>
+								}
+							</div>
+
+							<!-- Attempts timeline -->
+							<div class="p-5">
+								if len(detail.Attempts) == 0 {
+									<p class="text-sm text-gray-400 italic">No delivery attempts recorded yet.</p>
+								} else {
+									<div class="relative">
+										<div class="absolute left-4 top-0 bottom-0 w-0.5 bg-purple-100"></div>
+										<div class="space-y-6">
+											for _, attempt := range detail.Attempts {
+												<div class="relative pl-12">
+													<div class={ "absolute left-0 w-8 h-8 rounded-full border-4 border-white shadow-sm flex items-center justify-center",
+														templ.KV("bg-green-500", attempt.Outcome == "DELIVERED"),
+														templ.KV("bg-yellow-500", attempt.Outcome == "DEFERRED"),
+														templ.KV("bg-red-500", attempt.Outcome == "FAILED") }>
+														if attempt.Outcome == "DELIVERED" {
+															<svg class="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+																<path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7" />
+															</svg>
+														} else if attempt.Outcome == "FAILED" {
+															<svg class="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+																<path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M6 18L18 6M6 6l12 12" />
+															</svg>
+														} else {
+															<svg class="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+																<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+															</svg>
+														}
+													</div>
+													<div class="bg-white border border-purple-100 rounded-xl p-4 shadow-sm hover:shadow-md transition-shadow">
+														<div class="flex items-center justify-between mb-2">
+															<div class="flex items-center gap-2">
+																<span class="text-xs font-bold text-gray-500 uppercase tracking-tight">
+																	{ fmt.Sprintf("Attempt %d", attempt.AttemptNumber) }
+																</span>
+																<span class={ "px-2 py-0.5 rounded text-[10px] font-bold uppercase",
+																	templ.KV("bg-green-100 text-green-700", attempt.Outcome == "DELIVERED"),
+																	templ.KV("bg-yellow-100 text-yellow-700", attempt.Outcome == "DEFERRED"),
+																	templ.KV("bg-red-100 text-red-700", attempt.Outcome == "FAILED") }>
+																	{ attempt.Outcome }
+																</span>
+															</div>
+															<span class="text-xs text-gray-400" data-local-time={ attempt.AttemptDatetime.Format("2006-01-02T15:04:05Z07:00") } data-format="detail">
+																{ attempt.AttemptDatetime.Format("Jan 02, 15:04:05") }
+															</span>
+														</div>
+														if attempt.ServerResponse != nil {
+															<div class="mt-2 bg-gray-50 rounded-lg p-3 border border-gray-100">
+																<pre class="text-[11px] font-mono text-gray-600 leading-tight whitespace-pre-wrap break-all">{ *attempt.ServerResponse }</pre>
+															</div>
+														}
+													</div>
+												</div>
+											}
+										</div>
+									</div>
+								}
+							</div>
+						</div>
+					}
+				}
+			</div>
+		</div>
+	</div>
+}

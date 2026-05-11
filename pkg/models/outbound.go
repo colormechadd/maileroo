@@ -24,6 +24,15 @@ const (
 	OutboundFailed    OutboundStatus = "FAILED"
 )
 
+type OutboundJobAttempt struct {
+	ID             uuid.UUID `db:"id"`
+	JobID          uuid.UUID `db:"job_id"`
+	AttemptNumber  int       `db:"attempt_number"`
+	Outcome        string    `db:"outcome"`
+	ServerResponse *string   `db:"server_response"`
+	AttemptDatetime time.Time `db:"attempt_datetime"`
+}
+
 type OutboundJob struct {
 	ID                  uuid.UUID      `db:"id"`
 	EmailID             *uuid.UUID     `db:"email_id"`

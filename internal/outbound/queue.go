@@ -17,6 +17,7 @@ type QueueDB interface {
 	UpdateOutboundJobDelivered(ctx context.Context, id uuid.UUID) error
 	UpdateOutboundJobFailed(ctx context.Context, id uuid.UUID, lastError string) error
 	UpdateOutboundJobDeferred(ctx context.Context, id uuid.UUID, lastError string, attemptCount int, nextAttemptAt time.Time) error
+	InsertOutboundJobAttempt(ctx context.Context, jobID uuid.UUID, attemptNumber int, outcome string, serverResponse *string) error
 }
 
 // retryDelays maps attempt number (1-based) to the delay before the next retry.
@@ -75,32 +76,42 @@ func bounceAddress(fromAddress string, jobID uuid.UUID) string {
 }
 
 func (q *Queue) deliver(ctx context.Context, job models.OutboundJob) {
+	attemptNumber := job.AttemptCount + 1
 	mailFrom := bounceAddress(job.FromAddress, job.ID)
-	err := q.mta.Send(mailFrom, job.Recipients, job.RawMessage)
+	serverResp, err := q.mta.SendWithResponse(mailFrom, job.Recipients, job.RawMessage)
 	if err != nil {
-		nextAttempt := job.AttemptCount + 1
-		if nextAttempt >= job.MaxAttempts {
-			if dbErr := q.db.UpdateOutboundJobFailed(ctx, job.ID, err.Error()); dbErr != nil {
+		errStr := err.Error()
+		if attemptNumber >= job.MaxAttempts {
+			if dbErr := q.db.UpdateOutboundJobFailed(ctx, job.ID, errStr); dbErr != nil {
 				slog.Error("failed to mark job as FAILED", "job_id", job.ID, "error", dbErr)
 			}
-			slog.Warn("outbound job permanently failed", "job_id", job.ID, "attempts", nextAttempt, "error", err)
+			q.recordAttempt(ctx, job.ID, attemptNumber, "FAILED", &errStr)
+			slog.Warn("outbound job permanently failed", "job_id", job.ID, "attempts", attemptNumber, "error", err)
 			return
 		}
 
-		delayIdx := nextAttempt - 1
+		delayIdx := attemptNumber - 1
 		if delayIdx >= len(retryDelays) {
 			delayIdx = len(retryDelays) - 1
 		}
 		nextAttemptAt := time.Now().Add(retryDelays[delayIdx])
-		if dbErr := q.db.UpdateOutboundJobDeferred(ctx, job.ID, err.Error(), nextAttempt, nextAttemptAt); dbErr != nil {
+		if dbErr := q.db.UpdateOutboundJobDeferred(ctx, job.ID, errStr, attemptNumber, nextAttemptAt); dbErr != nil {
 			slog.Error("failed to mark job as DEFERRED", "job_id", job.ID, "error", dbErr)
 		}
-		slog.Warn("outbound job deferred", "job_id", job.ID, "attempt", nextAttempt, "next_attempt_at", nextAttemptAt, "error", err)
+		q.recordAttempt(ctx, job.ID, attemptNumber, "DEFERRED", &errStr)
+		slog.Warn("outbound job deferred", "job_id", job.ID, "attempt", attemptNumber, "next_attempt_at", nextAttemptAt, "error", err)
 		return
 	}
 
 	if dbErr := q.db.UpdateOutboundJobDelivered(ctx, job.ID); dbErr != nil {
 		slog.Error("failed to mark job as DELIVERED", "job_id", job.ID, "error", dbErr)
 	}
-	slog.Info("outbound job delivered", "job_id", job.ID)
+	q.recordAttempt(ctx, job.ID, attemptNumber, "DELIVERED", &serverResp)
+	slog.Info("outbound job delivered", "job_id", job.ID, "server_response", serverResp)
+}
+
+func (q *Queue) recordAttempt(ctx context.Context, jobID uuid.UUID, attemptNumber int, outcome string, serverResponse *string) {
+	if err := q.db.InsertOutboundJobAttempt(ctx, jobID, attemptNumber, outcome, serverResponse); err != nil {
+		slog.Error("failed to record outbound job attempt", "job_id", jobID, "error", err)
+	}
 }

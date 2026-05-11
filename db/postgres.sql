@@ -352,6 +352,20 @@ CREATE TABLE public.outbound_job (
 
 
 --
+-- Name: outbound_job_attempt; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.outbound_job_attempt (
+    id uuid DEFAULT uuidv7() NOT NULL,
+    job_id uuid NOT NULL,
+    attempt_number integer NOT NULL,
+    outcome text NOT NULL,
+    server_response text,
+    attempt_datetime timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+--
 -- Name: schema_migrations; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -559,6 +573,14 @@ ALTER TABLE ONLY public.mailbox
 
 ALTER TABLE ONLY public.mailbox_user
     ADD CONSTRAINT mailbox_user_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: outbound_job_attempt outbound_job_attempt_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.outbound_job_attempt
+    ADD CONSTRAINT outbound_job_attempt_pkey PRIMARY KEY (id);
 
 
 --
@@ -830,6 +852,13 @@ CREATE INDEX idx_mailbox_user_user_id ON public.mailbox_user USING btree (user_i
 
 
 --
+-- Name: idx_outbound_job_attempt_job_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_outbound_job_attempt_job_id ON public.outbound_job_attempt USING btree (job_id);
+
+
+--
 -- Name: idx_outbound_job_status_next; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -1026,6 +1055,14 @@ ALTER TABLE ONLY public.mailbox_user
 
 
 --
+-- Name: outbound_job_attempt outbound_job_attempt_job_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.outbound_job_attempt
+    ADD CONSTRAINT outbound_job_attempt_job_id_fkey FOREIGN KEY (job_id) REFERENCES public.outbound_job(id) ON DELETE CASCADE;
+
+
+--
 -- Name: outbound_job outbound_job_email_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -1078,4 +1115,5 @@ ALTER TABLE ONLY public.webmail_session
 
 INSERT INTO public.schema_migrations (version) VALUES
     ('20260509000000'),
-    ('20260510000000');
+    ('20260510000000'),
+    ('20260510000001');

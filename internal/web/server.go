@@ -129,7 +129,7 @@ func (s *Server) Routes() http.Handler {
 
 	r.Get("/login", s.handleLoginGet)
 	r.Post("/login", s.handleLoginPost)
-	r.Post("/logout", s.handleLogout)
+	r.Get("/logout", s.handleLogout)
 	r.Get("/proxy/image", s.handleProxyImage)
 
 	r.Group(func(r chi.Router) {

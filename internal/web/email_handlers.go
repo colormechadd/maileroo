@@ -537,6 +537,29 @@ func (s *Server) handleEmailPipeline(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	mailboxes, err := s.DB.GetMailboxesByUserID(r.Context(), user.ID)
+	if err != nil {
+		slog.Error("failed to fetch mailboxes", "user_id", user.ID, "error", err)
+	}
+	counts := s.getCounts(r.Context(), email.MailboxID, user.ID)
+
+	if email.Direction == models.DirectionOutbound {
+		jobs, err := s.DB.GetOutboundJobsByEmailID(r.Context(), emailID)
+		if err != nil {
+			slog.Error("failed to fetch outbound jobs", "email_id", emailID, "error", err)
+		}
+		details := make([]templates.OutboundJobDetail, 0, len(jobs))
+		for _, job := range jobs {
+			attempts, err := s.DB.GetOutboundJobAttemptsByJobID(r.Context(), job.ID)
+			if err != nil {
+				slog.Error("failed to fetch outbound job attempts", "job_id", job.ID, "error", err)
+			}
+			details = append(details, templates.OutboundJobDetail{Job: job, Attempts: attempts})
+		}
+		s.render(w, r, user, mailboxes, email.MailboxID, "sent", counts, templates.EmailOutboundPipeline(email, details), truncateTitle(email.Subject, 60))
+		return
+	}
+
 	steps, err := s.DB.GetIngestionStepsByEmailID(r.Context(), emailID, user.ID)
 	if err != nil {
 		slog.Error("failed to fetch ingestion steps", "email_id", emailID, "error", err)
@@ -551,11 +574,5 @@ func (s *Server) handleEmailPipeline(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	mailboxes, err := s.DB.GetMailboxesByUserID(r.Context(), user.ID)
-	if err != nil {
-		slog.Error("failed to fetch mailboxes", "user_id", user.ID, "error", err)
-	}
-
-	counts := s.getCounts(r.Context(), email.MailboxID, user.ID)
 	s.render(w, r, user, mailboxes, email.MailboxID, "all", counts, templates.EmailPipeline(email, steps), truncateTitle(email.Subject, 60))
 }
