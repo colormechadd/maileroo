@@ -68,29 +68,30 @@ templ IconGear() {
 }
 
 templ Icon(name string) {
-	if name == "inbox" {
-		@IconInbox()
-	} else if name == "all" {
-		@IconAll()
-	} else if name == "unread" {
-		@IconUnread()
-	} else if name == "read" {
-		@IconRead()
-	} else if name == "starred" {
-		@IconStarred()
-	} else if name == "sent" {
-		@IconSent()
-	} else if name == "quarantined" {
-		@IconQuarantined()
-	} else if name == "trash" || name == "deleted" {
-		@IconTrash()
-	} else if name == "drafts" {
-		@IconDrafts()
-	} else if name == "contacts" {
-		@IconContacts()
-	} else {
-		<svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-			<path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
-		</svg>
-	}
+    switch name {
+        case "inbox":
+            @IconInbox()
+        case "all":
+            @IconAll()
+        case "unread":
+            @IconUnread()
+        case "read":
+            @IconRead()
+        case "starred":
+            @IconStarred()
+        case "sent":
+            @IconSent()
+        case "quarantined":
+            @IconQuarantined()
+        case "trash", "deleted":
+            @IconTrash()
+        case "drafts":
+            @IconDrafts()
+        case "contacts":
+            @IconContacts()
+        default:
+            <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
+            </svg>
+    }
 }

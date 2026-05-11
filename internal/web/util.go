@@ -48,26 +48,6 @@ func truncateTitle(s string, max int) string {
 	return string(runes[:max]) + "…"
 }
 
-func (s *Server) draftCount(ctx context.Context, mailboxID uuid.UUID, userID uuid.UUID) int {
-	if mailboxID == uuid.Nil {
-		return 0
-	}
-	count, _ := s.DB.CountDraftsByMailboxID(ctx, mailboxID, userID)
-	return count
-}
-
-func defaultMailboxID(mailboxes []models.Mailbox) uuid.UUID {
-	for _, mb := range mailboxes {
-		if strings.ToLower(mb.Name) == "inbox" {
-			return mb.ID
-		}
-	}
-	if len(mailboxes) > 0 {
-		return mailboxes[0].ID
-	}
-	return uuid.Nil
-}
-
 func (s *Server) getCounts(ctx context.Context, mailboxID, userID uuid.UUID) map[string]int {
 	counts := make(map[string]int)
 	if mailboxID == uuid.Nil {

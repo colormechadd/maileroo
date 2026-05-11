@@ -9,6 +9,7 @@ import (
 	"github.com/colormechadd/mailaroo/pkg/models"
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
+	"github.com/gorilla/csrf"
 )
 
 func forwardedHostMiddleware(next http.Handler) http.Handler {
@@ -28,6 +29,19 @@ func securityHeaders(next http.Handler) http.Handler {
 		w.Header().Set("Permissions-Policy", "geolocation=(), microphone=(), camera=()")
 		w.Header().Set("Strict-Transport-Security", "max-age=31536000; includeSubDomains")
 		//w.Header().Set("Content-Security-Policy", "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; frame-ancestors 'none'")
+		next.ServeHTTP(w, r)
+	})
+}
+
+func htmxCSRFMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Only inject the header if it's an HTMX request
+		// This prevents bloating standard page loads where the token is already in the HTML
+		if r.Header.Get("HX-Request") == "true" {
+			token := csrf.Token(r)
+			w.Header().Set("X-CSRF-Token", token)
+		}
+
 		next.ServeHTTP(w, r)
 	})
 }

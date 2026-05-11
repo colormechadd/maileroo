@@ -11,9 +11,6 @@ import (
 	"github.com/stretchr/testify/mock"
 )
 
-//go:fix inline
-func strPtr(s string) *string { return new(s) }
-
 func activeRule(action string, conditions ...models.FilterCondition) *models.FilterRule {
 	return &models.FilterRule{
 		ID:             uuid.New(),
