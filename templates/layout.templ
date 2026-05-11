@@ -69,10 +69,18 @@ templ Layout(title string, csrfToken string) {
 
 				document.addEventListener('DOMContentLoaded', formatLocalTimes);
 				document.addEventListener('htmx:afterSettle', formatLocalTimes);
-				document.addEventListener('htmx:configRequest', function(e) {
-					const token = document.querySelector('meta[name="csrf-token"]');
-					if (token) e.detail.headers['X-CSRF-Token'] = token.content;
-				});
+				document.addEventListener('htmx:configRequest', function(evt) {
+                    // Ensure the latest token is always pulled from the meta tag
+                    evt.detail.headers['X-CSRF-Token'] = document.querySelector('meta[name="csrf-token"]').content;
+                });
+
+                document.addEventListener('htmx:afterRequest', function(evt) {
+                    // If the server sent a new token in the response header, update the meta tag
+                    let newToken = evt.detail.xhr.getResponseHeader("X-CSRF-Token");
+                    if (newToken) {
+                        document.querySelector('meta[name="csrf-token"]').content = newToken;
+                    }
+                });
 				document.addEventListener('htmx:afterSettle', function() {
 					const path = window.location.pathname;
 					const params = new URLSearchParams(window.location.search);
@@ -88,7 +96,7 @@ templ Layout(title string, csrfToken string) {
 				});
 			</script>
 		</head>
-		<body hx-headers={ `{"X-CSRF-Token":"` + csrfToken + `"}` } class="h-full bg-gray-50 text-gray-900 font-sans antialiased">
+		<body class="h-full bg-gray-50 text-gray-900 font-sans antialiased">
 			{ children... }
 		</body>
 	</html>

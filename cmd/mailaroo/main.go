@@ -244,7 +244,6 @@ func runWebServer(ctx context.Context, cfg *config.Config, webServer *web.Server
 		slog.Error("Web server shutdown failed", "error", err)
 	}
 	slog.Info("Stopped web server")
-
 }
 
 func initLogger(cfg *config.Config) {

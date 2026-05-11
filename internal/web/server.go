@@ -82,6 +82,19 @@ func (s *Server) cleanupLoginLimiters() {
 	}
 }
 
+func HTMXCSRFMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Only inject the header if it's an HTMX request
+		// This prevents bloating standard page loads where the token is already in the HTML
+		if r.Header.Get("HX-Request") == "true" {
+			token := csrf.Token(r)
+			w.Header().Set("X-CSRF-Token", token)
+		}
+
+		next.ServeHTTP(w, r)
+	})
+}
+
 func (s *Server) Routes() http.Handler {
 	csrfKey, err := base64.StdEncoding.DecodeString(s.Config.Web.CSRFAuthKey)
 	if err != nil || len(csrfKey) != 32 {
@@ -113,6 +126,7 @@ func (s *Server) Routes() http.Handler {
 	r.Use(chiMiddleware.Logger)
 	r.Use(chiMiddleware.Recoverer)
 	r.Use(securityHeaders)
+	r.Use(HTMXCSRFMiddleware)
 
 	r.NotFound(func(w http.ResponseWriter, r *http.Request) {
 		slog.Warn("route not found", "method", r.Method, "path", r.URL.Path)
