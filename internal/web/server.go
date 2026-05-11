@@ -140,6 +140,7 @@ func (s *Server) Routes() http.Handler {
 		r.Get("/mailbox/{mailboxID}/more", s.handleMailboxMore)
 		r.Get("/mailbox/{mailboxID}/search", s.handleMailboxSearch)
 		r.Get("/mailbox/{mailboxID}/search/more", s.handleSearchMore)
+		r.Get("/mailbox/{mailboxID}/unread-count", s.handleMailboxUnreadCount)
 		r.Group(func(r chi.Router) {
 			r.Use(s.validateUserAccessToEmailID)
 

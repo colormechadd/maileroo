@@ -53,7 +53,7 @@ func (s *Server) handleContactsPage(w http.ResponseWriter, r *http.Request) {
 
 	var recentEmails []models.Email
 	if selected != nil {
-		recentEmails, err = s.DB.SearchEmails(r.Context(), mailboxID, user.ID, db.EmailFilter{From: selected.Email}, 3, nil, nil)
+		recentEmails, err = s.DB.SearchEmails(r.Context(), mailboxID, user.ID, db.EmailFilter{Participant:selected.Email}, 3, nil, nil)
 		if err != nil {
 			slog.Error("failed to fetch recent emails for contact", "contact_id", selected.ID, "error", err)
 		}
@@ -96,7 +96,7 @@ func (s *Server) handleContactView(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	recentEmails, err := s.DB.SearchEmails(r.Context(), mailboxID, user.ID, db.EmailFilter{From: selected.Email}, 3, nil, nil)
+	recentEmails, err := s.DB.SearchEmails(r.Context(), mailboxID, user.ID, db.EmailFilter{Participant:selected.Email}, 3, nil, nil)
 	if err != nil {
 		slog.Error("failed to fetch recent emails for contact", "contact_id", contactID, "error", err)
 	}
@@ -189,7 +189,7 @@ func (s *Server) handleContactCreate(w http.ResponseWriter, r *http.Request) {
 	}
 
 	contacts, _ := s.DB.ListContacts(r.Context(), mailboxID)
-	recentEmails, _ := s.DB.SearchEmails(r.Context(), mailboxID, user.ID, db.EmailFilter{From: created.Email}, 3, nil, nil)
+	recentEmails, _ := s.DB.SearchEmails(r.Context(), mailboxID, user.ID, db.EmailFilter{Participant:created.Email}, 3, nil, nil)
 	templates.ContactsPage(mailboxID, contacts, created, recentEmails, false, s.contactBlocked(r.Context(), mailboxID, created)).Render(r.Context(), w)
 }
 
@@ -243,7 +243,7 @@ func (s *Server) handleContactUpdate(w http.ResponseWriter, r *http.Request) {
 	contacts, _ := s.DB.ListContacts(r.Context(), mailboxID)
 	var recentEmails []models.Email
 	if updated != nil {
-		recentEmails, _ = s.DB.SearchEmails(r.Context(), mailboxID, user.ID, db.EmailFilter{From: updated.Email}, 3, nil, nil)
+		recentEmails, _ = s.DB.SearchEmails(r.Context(), mailboxID, user.ID, db.EmailFilter{Participant:updated.Email}, 3, nil, nil)
 	}
 	templates.ContactsPage(mailboxID, contacts, updated, recentEmails, false, s.contactBlocked(r.Context(), mailboxID, updated)).Render(r.Context(), w)
 }
@@ -296,7 +296,7 @@ func (s *Server) handleContactToggleFavorite(w http.ResponseWriter, r *http.Requ
 	contacts, _ := s.DB.ListContacts(r.Context(), mailboxID)
 	var recentEmails []models.Email
 	if updated != nil {
-		recentEmails, _ = s.DB.SearchEmails(r.Context(), mailboxID, user.ID, db.EmailFilter{From: updated.Email}, 3, nil, nil)
+		recentEmails, _ = s.DB.SearchEmails(r.Context(), mailboxID, user.ID, db.EmailFilter{Participant:updated.Email}, 3, nil, nil)
 	}
 	templates.ContactsPage(mailboxID, contacts, updated, recentEmails, false, s.contactBlocked(r.Context(), mailboxID, updated)).Render(r.Context(), w)
 }

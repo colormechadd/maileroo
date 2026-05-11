@@ -198,7 +198,11 @@ func (s *Server) handleBulkEmailAction(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	hasMore := len(emails) == 50
-	s.render(w, r, user, mailboxes, mailboxID, filter, counts, templates.MailboxContent(mailboxID, filter, emails, "", hasMore), "")
+	var contacts map[string]*models.Contact
+	if cs, err := s.DB.ListContacts(r.Context(), mailboxID); err == nil {
+		contacts = buildContactsMap(cs)
+	}
+	s.render(w, r, user, mailboxes, mailboxID, filter, counts, templates.MailboxContent(mailboxID, filter, emails, "", hasMore, contacts), "")
 }
 
 func (s *Server) handleEmailDelete(w http.ResponseWriter, r *http.Request) {
@@ -227,11 +231,15 @@ func (s *Server) handleEmailDelete(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	dest := "/mailbox/" + email.MailboxID.String()
+	if email.Direction == models.DirectionOutbound {
+		dest += "?filter=sent"
+	}
 	if r.Header.Get("HX-Request") == "true" {
-		w.Header().Set("HX-Redirect", "/mailbox/"+email.MailboxID.String())
+		w.Header().Set("HX-Redirect", dest)
 		return
 	}
-	http.Redirect(w, r, "/mailbox/"+email.MailboxID.String(), http.StatusSeeOther)
+	http.Redirect(w, r, dest, http.StatusSeeOther)
 }
 
 func (s *Server) handleEmailDeleteAndBlock(w http.ResponseWriter, r *http.Request) {

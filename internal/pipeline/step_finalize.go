@@ -14,6 +14,7 @@ func Finalize(ctx context.Context, p *Pipeline, ictx *IngestionContext) (StepSta
 		return StatusError, nil, err
 	}
 
+	ictx.IsRead = isRead
 	return StatusPass, map[string]any{"status": status}, nil
 }
 

@@ -93,6 +93,7 @@ type IngestionContext struct {
 	EmailID          uuid.UUID
 	MatchedFilterRuleID *uuid.UUID
 	FilterAction        string
+	IsRead              bool
 }
 
 func (p *Pipeline) Process(ctx context.Context, ictx *IngestionContext) error {

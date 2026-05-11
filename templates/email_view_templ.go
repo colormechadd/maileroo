@@ -586,14 +586,14 @@ func EmailSenderInfo(email *models.Email, senderContact *models.Contact, senderB
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 54, "\" hx-target=\"#main-content\" hx-push-url=\"true\" class=\"font-bold text-teal-600 hover:text-teal-800 hover:underline cursor-pointer\">")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 54, "\" hx-target=\"#main-content\" hx-push-url=\"true\" class=\"font-bold text-gray-900 hover:underline cursor-pointer\">")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 			var templ_7745c5c3_Var34 string
 			templ_7745c5c3_Var34, templ_7745c5c3_Err = templ.JoinStringErrs(senderContact.DisplayName())
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `templates/email_view.templ`, Line: 241, Col: 261}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `templates/email_view.templ`, Line: 241, Col: 241}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var34))
 			if templ_7745c5c3_Err != nil {

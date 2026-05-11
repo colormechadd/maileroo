@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/colormechadd/mailaroo/internal/db"
 	"github.com/colormechadd/mailaroo/internal/mail"
 	"github.com/colormechadd/mailaroo/internal/outbound"
 	"github.com/colormechadd/mailaroo/pkg/models"
@@ -291,7 +292,28 @@ func (s *Server) handleEmailSend(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if r.Header.Get("HX-Request") == "true" {
-		w.Header().Set("HX-Location", "/mailbox/"+sa.MailboxID.String()+"?filter=sent")
+		mailboxes, err := s.DB.GetMailboxesByUserID(r.Context(), user.ID)
+		if err != nil {
+			slog.Error("failed to fetch mailboxes after send", "error", err)
+			http.Error(w, "Internal error", http.StatusInternalServerError)
+			return
+		}
+		const pageSize = 50
+		emails, err := s.DB.SearchEmails(r.Context(), sa.MailboxID, user.ID, db.EmailFilter{View: "sent"}, pageSize, nil, nil)
+		if err != nil {
+			slog.Error("failed to fetch sent emails after send", "error", err)
+			http.Error(w, "Internal error", http.StatusInternalServerError)
+			return
+		}
+		hasMore := len(emails) == pageSize
+		var contacts map[string]*models.Contact
+		if cs, err := s.DB.ListContacts(r.Context(), sa.MailboxID); err == nil {
+			contacts = buildContactsMap(cs)
+		}
+		sentURL := "/mailbox/" + sa.MailboxID.String() + "?filter=sent"
+		w.Header().Set("HX-Push-Url", sentURL)
+		counts := s.getCounts(r.Context(), sa.MailboxID, user.ID)
+		s.render(w, r, user, mailboxes, sa.MailboxID, "sent", counts, templates.MailboxContent(sa.MailboxID, "sent", emails, "", hasMore, contacts), "Sent")
 		return
 	}
 	http.Redirect(w, r, "/mailbox/"+sa.MailboxID.String()+"?filter=sent", http.StatusSeeOther)

@@ -37,7 +37,7 @@ func (s *Server) handleDashboard(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	s.render(w, r, user, mailboxes, uuid.Nil, "all", nil, templates.MailboxContent(uuid.Nil, "all", nil, "", false), "MAILAROO")
+	s.render(w, r, user, mailboxes, uuid.Nil, "all", nil, templates.MailboxContent(uuid.Nil, "all", nil, "", false, nil), "MAILAROO")
 }
 
 func (s *Server) handleMailboxView(w http.ResponseWriter, r *http.Request) {
@@ -101,7 +101,11 @@ func (s *Server) handleMailboxView(w http.ResponseWriter, r *http.Request) {
 	}
 
 	hasMore := len(emails) == pageSize
-	s.render(w, r, user, mailboxes, mailboxID, filter, counts, templates.MailboxContent(mailboxID, filter, emails, "", hasMore), filterTitle(filter))
+	var contacts map[string]*models.Contact
+	if cs, err := s.DB.ListContacts(r.Context(), mailboxID); err == nil {
+		contacts = buildContactsMap(cs)
+	}
+	s.render(w, r, user, mailboxes, mailboxID, filter, counts, templates.MailboxContent(mailboxID, filter, emails, "", hasMore, contacts), filterTitle(filter))
 }
 
 func (s *Server) handleMailboxSearch(w http.ResponseWriter, r *http.Request) {
@@ -138,7 +142,7 @@ func (s *Server) handleMailboxSearch(w http.ResponseWriter, r *http.Request) {
 	}
 
 	const pageSize = 50
-	emails, err := s.DB.SearchEmails(r.Context(), mailboxID, user.ID, db.EmailFilter{Text: query}, pageSize, nil, nil)
+	emails, err := s.DB.SearchEmails(r.Context(), mailboxID, user.ID, buildEmailFilterFromQuery(query), pageSize, nil, nil)
 	if err != nil {
 		slog.Error("search failed", "mailbox_id", mailboxID, "query", query, "error", err)
 		http.Error(w, "Internal error", http.StatusInternalServerError)
@@ -147,7 +151,11 @@ func (s *Server) handleMailboxSearch(w http.ResponseWriter, r *http.Request) {
 
 	counts := s.getCounts(r.Context(), mailboxID, user.ID)
 	hasMore := len(emails) == pageSize
-	s.render(w, r, user, mailboxes, mailboxID, "search", counts, templates.SearchContent(mailboxID, query, emails, hasMore), "Search: "+query)
+	var contacts map[string]*models.Contact
+	if cs, err := s.DB.ListContacts(r.Context(), mailboxID); err == nil {
+		contacts = buildContactsMap(cs)
+	}
+	s.render(w, r, user, mailboxes, mailboxID, "search", counts, templates.SearchContent(mailboxID, query, emails, hasMore, contacts), "Search: "+query)
 }
 
 func (s *Server) handleMailboxMore(w http.ResponseWriter, r *http.Request) {
@@ -201,7 +209,11 @@ func (s *Server) handleMailboxMore(w http.ResponseWriter, r *http.Request) {
 		last := emails[len(emails)-1]
 		loadMoreURL = "/mailbox/" + mailboxID.String() + "/more?filter=" + filter + "&cursor=" + encodeCursor(last.ReceiveDatetime, last.ID)
 	}
-	templates.EmailListRows(emails, filter, loadMoreURL, hasMore).Render(r.Context(), w)
+	var contacts map[string]*models.Contact
+	if cs, err := s.DB.ListContacts(r.Context(), mailboxID); err == nil {
+		contacts = buildContactsMap(cs)
+	}
+	templates.EmailListRows(emails, filter, loadMoreURL, hasMore, contacts).Render(r.Context(), w)
 }
 
 func (s *Server) handleSearchMore(w http.ResponseWriter, r *http.Request) {
@@ -241,7 +253,7 @@ func (s *Server) handleSearchMore(w http.ResponseWriter, r *http.Request) {
 	}
 
 	const pageSize = 50
-	emails, err := s.DB.SearchEmails(r.Context(), mailboxID, user.ID, db.EmailFilter{Text: query}, pageSize, cursorTime, cursorID)
+	emails, err := s.DB.SearchEmails(r.Context(), mailboxID, user.ID, buildEmailFilterFromQuery(query), pageSize, cursorTime, cursorID)
 	if err != nil {
 		slog.Error("search more failed", "mailbox_id", mailboxID, "query", query, "error", err)
 		http.Error(w, "Internal error", http.StatusInternalServerError)
@@ -254,7 +266,11 @@ func (s *Server) handleSearchMore(w http.ResponseWriter, r *http.Request) {
 		last := emails[len(emails)-1]
 		loadMoreURL = "/mailbox/" + mailboxID.String() + "/search/more?q=" + url.QueryEscape(query) + "&cursor=" + encodeCursor(last.ReceiveDatetime, last.ID)
 	}
-	templates.EmailListRows(emails, "search", loadMoreURL, hasMore).Render(r.Context(), w)
+	var contacts map[string]*models.Contact
+	if cs, err := s.DB.ListContacts(r.Context(), mailboxID); err == nil {
+		contacts = buildContactsMap(cs)
+	}
+	templates.EmailListRows(emails, "search", loadMoreURL, hasMore, contacts).Render(r.Context(), w)
 }
 
 func encodeCursor(t time.Time, id uuid.UUID) string {
@@ -280,4 +296,15 @@ func decodeCursor(cursor string) (*time.Time, *uuid.UUID, error) {
 		return nil, nil, err
 	}
 	return &t, &id, nil
+}
+
+func (s *Server) handleMailboxUnreadCount(w http.ResponseWriter, r *http.Request) {
+	user := r.Context().Value("user").(*models.User)
+	mailboxID, _, err := s.getMailboxForUser(r, chi.URLParam(r, "mailboxID"), user.ID)
+	if err != nil {
+		http.Error(w, "Not found", http.StatusNotFound)
+		return
+	}
+	count, _ := s.DB.CountEmailsByMailboxID(r.Context(), mailboxID, "unread")
+	templates.UnreadCountBadge(count).Render(r.Context(), w)
 }

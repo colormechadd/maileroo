@@ -135,11 +135,15 @@ func TestWebDB(t *testing.T) {
 		assert.Empty(t, boxes)
 	})
 
-	t.Run("GetEmailsByMailboxID", func(t *testing.T) {
-		t.Run("default/all returns INBOX emails", func(t *testing.T) {
-			emails, err := db.SearchEmails(ctx, mailboxID, session.UserID, EmailFilter{View: "all"}, 50, nil, nil)
+	t.Run("SearchEmails", func(t *testing.T) {
+		search := func(view string) []models.Email {
+			emails, err := db.SearchEmails(ctx, mailboxID, userID, EmailFilter{View: view}, 50, nil, nil)
 			assert.NoError(t, err)
-			ids := emailIDs(emails)
+			return emails
+		}
+
+		t.Run("all returns INBOX emails", func(t *testing.T) {
+			ids := emailIDs(search("all"))
 			assert.Contains(t, ids, inboxEmailID)
 			assert.Contains(t, ids, readEmailID)
 			assert.Contains(t, ids, starredEmailID)
@@ -148,66 +152,90 @@ func TestWebDB(t *testing.T) {
 		})
 
 		t.Run("unread", func(t *testing.T) {
-			emails, err := db.GetEmailsByMailboxID(ctx, mailboxID, "unread", 50, nil, nil)
-			assert.NoError(t, err)
-			ids := emailIDs(emails)
+			ids := emailIDs(search("unread"))
 			assert.Contains(t, ids, inboxEmailID)
 			assert.NotContains(t, ids, readEmailID)
 		})
 
 		t.Run("read", func(t *testing.T) {
-			emails, err := db.GetEmailsByMailboxID(ctx, mailboxID, "read", 50, nil, nil)
-			assert.NoError(t, err)
-			ids := emailIDs(emails)
+			ids := emailIDs(search("read"))
 			assert.Contains(t, ids, readEmailID)
 			assert.NotContains(t, ids, inboxEmailID)
 		})
 
 		t.Run("starred", func(t *testing.T) {
-			emails, err := db.GetEmailsByMailboxID(ctx, mailboxID, "starred", 50, nil, nil)
-			assert.NoError(t, err)
-			ids := emailIDs(emails)
+			ids := emailIDs(search("starred"))
 			assert.Contains(t, ids, starredEmailID)
 			assert.NotContains(t, ids, inboxEmailID)
 		})
 
 		t.Run("quarantined", func(t *testing.T) {
-			emails, err := db.GetEmailsByMailboxID(ctx, mailboxID, "quarantined", 50, nil, nil)
-			assert.NoError(t, err)
-			ids := emailIDs(emails)
+			ids := emailIDs(search("quarantined"))
 			assert.Contains(t, ids, quarantinedEmailID)
 			assert.NotContains(t, ids, inboxEmailID)
 		})
 
 		t.Run("deleted", func(t *testing.T) {
-			emails, err := db.GetEmailsByMailboxID(ctx, mailboxID, "deleted", 50, nil, nil)
-			assert.NoError(t, err)
-			ids := emailIDs(emails)
+			ids := emailIDs(search("deleted"))
 			assert.Contains(t, ids, deletedEmailID)
 			assert.NotContains(t, ids, inboxEmailID)
 		})
 
 		t.Run("sent", func(t *testing.T) {
-			emails, err := db.GetEmailsByMailboxID(ctx, mailboxID, "sent", 50, nil, nil)
-			assert.NoError(t, err)
-			ids := emailIDs(emails)
+			ids := emailIDs(search("sent"))
 			assert.Contains(t, ids, sentEmailID)
 			assert.NotContains(t, ids, inboxEmailID)
 		})
 
 		t.Run("cursor pagination", func(t *testing.T) {
-			emails, err := db.GetEmailsByMailboxID(ctx, mailboxID, "all", 1, nil, nil)
+			emails, err := db.SearchEmails(ctx, mailboxID, userID, EmailFilter{View: "all"}, 1, nil, nil)
 			assert.NoError(t, err)
 			assert.Len(t, emails, 1)
 
 			if len(emails) > 0 {
 				cursor := emails[0].ReceiveDatetime
 				cursorID := emails[0].ID
-				emails2, err := db.GetEmailsByMailboxID(ctx, mailboxID, "all", 1, &cursor, &cursorID)
+				emails2, err := db.SearchEmails(ctx, mailboxID, userID, EmailFilter{View: "all"}, 1, &cursor, &cursorID)
 				assert.NoError(t, err)
 				assert.Len(t, emails2, 1)
 				assert.NotEqual(t, emails[0].ID, emails2[0].ID)
 			}
+		})
+
+		t.Run("full-text search", func(t *testing.T) {
+			results, err := db.SearchEmails(ctx, mailboxID, userID, EmailFilter{Text: "searchable"}, 50, nil, nil)
+			assert.NoError(t, err)
+			if assert.NotEmpty(t, results) {
+				assert.Equal(t, inboxEmailID, results[0].ID)
+			}
+
+			results, err = db.SearchEmails(ctx, mailboxID, userID, EmailFilter{Text: "unique content"}, 50, nil, nil)
+			assert.NoError(t, err)
+			if assert.NotEmpty(t, results) {
+				assert.Equal(t, inboxEmailID, results[0].ID)
+			}
+
+			results, err = db.SearchEmails(ctx, mailboxID, userID, EmailFilter{Text: "xyzzynotaword"}, 50, nil, nil)
+			assert.NoError(t, err)
+			assert.Empty(t, results)
+
+			// Other user gets nothing
+			results, err = db.SearchEmails(ctx, mailboxID, otherUserID, EmailFilter{Text: "searchable"}, 50, nil, nil)
+			assert.NoError(t, err)
+			assert.Empty(t, results)
+
+			// Deleted emails are excluded (default view="" excludes deleted)
+			results, err = db.SearchEmails(ctx, mailboxID, userID, EmailFilter{From: "gone@example.com"}, 50, nil, nil)
+			assert.NoError(t, err)
+			assert.Empty(t, results)
+		})
+
+		t.Run("participant filter", func(t *testing.T) {
+			results, err := db.SearchEmails(ctx, mailboxID, userID, EmailFilter{Participant: "alice@example.com"}, 50, nil, nil)
+			assert.NoError(t, err)
+			ids := emailIDs(results)
+			assert.Contains(t, ids, inboxEmailID)
+			assert.NotContains(t, ids, deletedEmailID)
 		})
 	})
 
@@ -460,36 +488,6 @@ func TestWebDB(t *testing.T) {
 		assert.Equal(t, 0, count)
 	})
 
-	t.Run("SearchEmailsByMailboxID", func(t *testing.T) {
-		// inboxEmailID has body_plain "unique searchable body content for test"
-		results, err := db.SearchEmailsByMailboxID(ctx, mailboxID, userID, "searchable", 50, nil, nil)
-		assert.NoError(t, err)
-		if assert.NotEmpty(t, results) {
-			assert.Equal(t, inboxEmailID, results[0].ID)
-		}
-
-		// Search another body term
-		results, err = db.SearchEmailsByMailboxID(ctx, mailboxID, userID, "unique content", 50, nil, nil)
-		assert.NoError(t, err)
-		if assert.NotEmpty(t, results) {
-			assert.Equal(t, inboxEmailID, results[0].ID)
-		}
-
-		// Query that matches nothing
-		results, err = db.SearchEmailsByMailboxID(ctx, mailboxID, userID, "xyzzynotaword", 50, nil, nil)
-		assert.NoError(t, err)
-		assert.Empty(t, results)
-
-		// Other user gets nothing from this mailbox
-		results, err = db.SearchEmailsByMailboxID(ctx, mailboxID, otherUserID, "searchable", 50, nil, nil)
-		assert.NoError(t, err)
-		assert.Empty(t, results)
-
-		// Deleted emails are excluded
-		results, err = db.SearchEmailsByMailboxID(ctx, mailboxID, userID, "gone", 50, nil, nil)
-		assert.NoError(t, err)
-		assert.Empty(t, results)
-	})
 }
 
 // emailIDs extracts IDs from a slice of emails for assertion convenience.

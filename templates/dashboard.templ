@@ -71,7 +71,7 @@ func getInboxID(mbs []models.Mailbox) uuid.UUID {
 func parseFromAddress(addr string) (name, email string) {
 	start := strings.Index(addr, "<")
 	end := strings.Index(addr, ">")
-	if start > 0 && end > start {
+	if start >= 0 && end > start {
 		name = strings.TrimSpace(addr[:start])
 		name = strings.Trim(name, `"'`)
 		email = strings.TrimSpace(addr[start+1 : end])
@@ -85,9 +85,17 @@ func getInitials(addr string) string {
 	if addr == "" {
 		return "?"
 	}
+	start := strings.Index(addr, "<")
+	end := strings.Index(addr, ">")
 	display := addr
-	if idx := strings.Index(addr, "<"); idx > 0 {
-		display = strings.TrimSpace(addr[:idx])
+	if start >= 0 && end > start {
+		name := strings.TrimSpace(addr[:start])
+		name = strings.Trim(name, `"'`)
+		if name != "" {
+			display = name
+		} else {
+			display = addr[start+1 : end]
+		}
 	}
 	display = strings.Trim(display, `"'`)
 	if display == "" {
@@ -110,6 +118,14 @@ func getAvatarColor(name string) string {
 		sum += int(r)
 	}
 	return colors[sum%len(colors)]
+}
+
+func lookupContact(contacts map[string]*models.Contact, addr string) *models.Contact {
+	if len(contacts) == 0 {
+		return nil
+	}
+	_, email := parseFromAddress(addr)
+	return contacts[strings.ToLower(email)]
 }
 
 func mailboxFilterTitle(filter string) string {
@@ -146,14 +162,24 @@ templ SidebarFilterLink(mailboxID uuid.UUID, filterName string, label string, ic
 			</div>
 			<span>{ label }</span>
 		</div>
-		if count > 0 {
-			<span class={ "inline-flex items-center justify-center px-2 py-0.5 rounded-full text-[10px] font-bold",
-				templ.KV("bg-purple-600 text-white", isBadgePurple),
-				templ.KV("bg-gray-100 text-gray-600", !isBadgePurple) }>
-				{ formatCount(count) }
-			</span>
-		}
+		<span id={ "badge-" + mailboxID.String() + "-" + filterName }>
+			if count > 0 {
+				<span class={ "inline-flex items-center justify-center px-2 py-0.5 rounded-full text-[10px] font-bold",
+					templ.KV("bg-purple-600 text-white", isBadgePurple),
+					templ.KV("bg-gray-100 text-gray-600", !isBadgePurple) }>
+					{ formatCount(count) }
+				</span>
+			}
+		</span>
 	</a>
+}
+
+templ UnreadCountBadge(count int) {
+	if count > 0 {
+		<span class="inline-flex items-center justify-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-purple-600 text-white">
+			{ formatCount(count) }
+		</span>
+	}
 }
 
 templ Dashboard(user *models.User, mailboxes []models.Mailbox, currentMailboxID uuid.UUID, filter string, counts map[string]int, content templ.Component, csrfToken string, title string) {
@@ -166,8 +192,8 @@ templ Dashboard(user *models.User, mailboxes []models.Mailbox, currentMailboxID 
 			 x-data={ "{ currentMailboxID: '" + currentMailboxID.String() + "', filter: '" + filter + "' }" }
 			 @nav-update.window="if ($event.detail.mailboxID !== undefined) currentMailboxID = $event.detail.mailboxID; filter = $event.detail.filter"
 		>
-			<!-- Listen for new-mail and refresh the list if we are in that mailbox -->
-			<div sse-swap="new-mail" hx-get={ "/mailbox/" + currentMailboxID.String() + "?filter=" + filter } hx-target="#main-content" class="hidden"></div>
+			<!-- Update unread count badge on new mail regardless of current view -->
+			<div hx-trigger="sse:new-mail" hx-get={ "/mailbox/" + currentMailboxID.String() + "/unread-count" } hx-target={ "#badge-" + currentMailboxID.String() + "-mail" } hx-swap="innerHTML" class="hidden"></div>
 
 			<!-- Sidebar -->
 			<aside class="w-64 flex-shrink-0 bg-white border-r border-purple-100 flex flex-col">
@@ -306,7 +332,7 @@ templ Dashboard(user *models.User, mailboxes []models.Mailbox, currentMailboxID 
 	}
 }
 
-templ EmailListRows(emails []models.Email, filter string, loadMoreURL string, hasMore bool) {
+templ EmailListRows(emails []models.Email, filter string, loadMoreURL string, hasMore bool, contacts map[string]*models.Contact) {
 	for _, email := range emails {
 		<li
 			class={ "hover:bg-gray-50 transition-colors cursor-pointer group relative flex items-center px-6 py-3 gap-4", templ.KV("bg-purple-50/30", !email.IsRead) }
@@ -325,15 +351,46 @@ templ EmailListRows(emails []models.Email, filter string, loadMoreURL string, ha
 				@EmailListStarButton(email.ID, email.IsStar)
 			</div>
 
-			<div class={ "h-10 w-10 rounded-full flex items-center justify-center font-bold text-sm flex-shrink-0", getAvatarColor(email.FromAddress) }>
-				{ getInitials(email.FromAddress) }
+			{{
+				isSent := filter == "sent"
+				displayAddr := email.FromAddress
+				if isSent {
+					displayAddr = email.ToAddress
+				}
+				rowContact := lookupContact(contacts, displayAddr)
+			}}
+			<div class={ "h-10 w-10 rounded-full flex items-center justify-center font-bold text-sm flex-shrink-0", getAvatarColor(displayAddr) }>
+				if rowContact != nil {
+					{ rowContact.Initials() }
+				} else {
+					{ getInitials(displayAddr) }
+				}
 			</div>
 
 			<div class="flex-1 min-w-0">
 				<div class="flex items-center justify-between mb-0.5">
 					<p class="text-sm truncate">
-						if filter == "sent" {
-							To: { email.ToAddress }
+						if rowContact != nil {
+							<a
+								hx-get={ "/mailbox/" + email.MailboxID.String() + "/contacts?id=" + rowContact.ID.String() }
+								hx-target="#main-content"
+								hx-push-url="true"
+								onclick="event.stopPropagation()"
+								class={ "cursor-pointer hover:underline",
+									templ.KV("font-bold text-gray-700", isSent),
+									templ.KV("font-bold text-gray-900", !isSent && !email.IsRead),
+									templ.KV("text-gray-600", !isSent && email.IsRead) }
+							>{ rowContact.DisplayName() }</a>
+						} else if isSent {
+							{{
+								toName, toEmail := parseFromAddress(email.ToAddress)
+							}}
+							if toName != "" {
+								<span class="font-bold text-gray-700">{ toName }</span>
+								<span class="text-gray-400 font-normal ml-1">{ toEmail }</span>
+							} else {
+								<span class="font-bold text-gray-700">{ toEmail }</span>
+							}
 						} else {
 							{{
 								fromName, fromEmail := parseFromAddress(email.FromAddress)
@@ -366,7 +423,9 @@ templ EmailListRows(emails []models.Email, filter string, loadMoreURL string, ha
 	}
 }
 
-templ MailboxContent(mailboxID uuid.UUID, filter string, emails []models.Email, searchQuery string, hasMore bool) {
+templ MailboxContent(mailboxID uuid.UUID, filter string, emails []models.Email, searchQuery string, hasMore bool, contacts map[string]*models.Contact) {
+	<!-- Refresh this list when new mail arrives; removed when navigating away so it won't hijack other views -->
+	<div hx-trigger="sse:new-mail" hx-get={ "/mailbox/" + mailboxID.String() + "?filter=" + filter } hx-target="#main-content" class="hidden"></div>
 	<!-- Header -->
 	<header class="h-16 border-b border-gray-100 flex items-center justify-between px-6 bg-white sticky top-0 z-10">
 		<div class="flex items-center gap-4">
@@ -442,7 +501,7 @@ templ MailboxContent(mailboxID uuid.UUID, filter string, emails []models.Email, 
 				}
 			}}
 			<ul class="divide-y divide-gray-50">
-				@EmailListRows(emails, filter, loadMoreURL, hasMore)
+				@EmailListRows(emails, filter, loadMoreURL, hasMore, contacts)
 			</ul>
 		} else if mailboxID != uuid.Nil {
 			<div class="flex flex-col items-center justify-center h-full text-gray-300 space-y-4">
@@ -506,9 +565,9 @@ templ MailboxContent(mailboxID uuid.UUID, filter string, emails []models.Email, 
 	</div>
 }
 
-templ SearchContent(mailboxID uuid.UUID, query string, emails []models.Email, hasMore bool) {
+templ SearchContent(mailboxID uuid.UUID, query string, emails []models.Email, hasMore bool, contacts map[string]*models.Contact) {
 	<!-- Search content uses the same structure as MailboxContent -->
-	@MailboxContent(mailboxID, "search", emails, query, hasMore)
+	@MailboxContent(mailboxID, "search", emails, query, hasMore, contacts)
 }
 
 templ DraftsContent(mailboxID uuid.UUID, drafts []models.Draft) {

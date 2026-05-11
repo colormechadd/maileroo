@@ -5,14 +5,43 @@ import (
 	"fmt"
 	"html"
 	"net/http"
+	"regexp"
 	"strings"
 
 	"github.com/a-h/templ"
+	"github.com/colormechadd/mailaroo/internal/db"
 	"github.com/colormechadd/mailaroo/pkg/models"
 	"github.com/colormechadd/mailaroo/templates"
 	"github.com/google/uuid"
 	"github.com/gorilla/csrf"
 )
+
+var searchFieldRe = regexp.MustCompile(`(?i)\b(from|to|subject):(\S+)`)
+
+// buildEmailFilterFromQuery parses a user search query into an EmailFilter.
+// Recognises from:, to:, subject: prefixes; remaining text becomes a full-text search.
+func buildEmailFilterFromQuery(query string) db.EmailFilter {
+	var f db.EmailFilter
+	remaining := searchFieldRe.ReplaceAllStringFunc(query, func(match string) string {
+		parts := searchFieldRe.FindStringSubmatch(match)
+		switch strings.ToLower(parts[1]) {
+		case "from":
+			f.From = parts[2]
+		case "to":
+			f.To = parts[2]
+		case "subject":
+			f.Subject = parts[2]
+		}
+		return ""
+	})
+	text := strings.TrimSpace(remaining)
+	if text != "" {
+		f.Text = text
+	} else if f.From == "" && f.To == "" && f.Subject == "" {
+		f.Text = query
+	}
+	return f
+}
 
 func (s *Server) render(w http.ResponseWriter, r *http.Request, user *models.User, mailboxes []models.Mailbox, currentMailboxID uuid.UUID, filter string, counts map[string]int, content templ.Component, title string) {
 	if r.Header.Get("HX-Request") == "true" && r.Header.Get("HX-History-Restore-Request") != "true" {
@@ -75,6 +104,14 @@ func (s *Server) getMailboxForUser(r *http.Request, mailboxIDStr string, userID 
 		}
 	}
 	return uuid.Nil, nil, fmt.Errorf("mailbox not found")
+}
+
+func buildContactsMap(contacts []models.Contact) map[string]*models.Contact {
+	m := make(map[string]*models.Contact, len(contacts))
+	for i := range contacts {
+		m[strings.ToLower(contacts[i].Email)] = &contacts[i]
+	}
+	return m
 }
 
 func parseAddresses(raw string) []string {
